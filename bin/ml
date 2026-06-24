@@ -764,7 +764,7 @@ cmd_diff() {
     diff -u "$a" "$b" || true
 }
 
-# ─── 子命令: profile ──────────────────────────────────────
+# ─── 子命令: profile ───────���──────────────────────────────
 cmd_profile() {
     local file="" fmt="text"
     while [[ $# -gt 0 ]]; do
@@ -779,6 +779,157 @@ cmd_profile() {
     [[ ! -f "$file" ]] && die "file not found: $file"
     local abs="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
     run_matlab "$(format_result "cli_profile('${abs}')" "${fmt}")"
+}
+
+# ─── 通用参数转发器 ────────────────────────────────��────────
+# 把所有 shell 参数原样转发给 MATLAB 函数 (字符串参数加单引号)
+# 用法: forward_to "cli_funcname" "$@"
+forward_to() {
+    local fn="$1"; shift
+    local code="${fn}"
+    local has_args=0
+    if [[ $# -gt 0 ]]; then
+        code="${code}("
+        has_args=1
+        local first=1
+        while [[ $# -gt 0 ]]; do
+            local arg="$1"
+            # 判断是否为纯数字 (含负数/小数);其他一律按字符串处理
+            if [[ "$arg" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+                if [[ $first -eq 1 ]]; then code="${code}${arg}"; else code="${code},${arg}"; fi
+            else
+                # 字符串参数: 转义单引号
+                local safe="${arg//\'/\'\\\'\'}"
+                if [[ $first -eq 1 ]]; then code="${code}'${safe}'"; else code="${code},'${safe}'"; fi
+            fi
+            first=0
+            shift
+        done
+        code="${code})"
+    fi
+    run_matlab "${code}"
+}
+
+# ─── 子命令: lti ───────────────────────────────────────────
+cmd_lti() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml lti <action> --tf "num/den" [options]
+Linear Time-Invariant system analysis (Control System Toolbox required)
+
+Actions:
+  ml lti info    --tf "[1] / [1 0.5 1]"
+  ml lti poles   --tf "[1] / [1 0.5 1]"
+  ml lti step    --tf "..." --tfinal 30
+  ml lti bode    --tf "..." --wmin 0.01 --wmax 10 --npts 100
+  ml lti nyquist --tf "..." --wmin 0.1 --wmax 10
+  ml lti margin  --tf "..."
+  ml lti roots   --tf "..."
+
+System spec:
+  --tf "num / den"              transfer function
+  --zpk "z:[z1,z2] p:[p1,p2] k:k"  zeros/poles/gain
+
+Options:
+  --tfinal T    --n N   --wmin/--wmax/--npts  --w w1,w2,...
+  --plot F.png   --format json|table|csv
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "lti needs action and system spec. ml lti info --tf \"[1]/[1 0.5 1]\""
+    forward_to "cli_lti" "$@"
+}
+
+# ─── 子命令: graph ─────────────────────────────────────────
+cmd_graph() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml graph <action> --edges "1-2,2-3" [options]
+Graph/network analysis (base MATLAB required)
+
+Actions:
+  ml graph info        --edges "1-2,2-3,3-4"
+  ml graph shortest    --edges "..." --from 1 --to 4
+  ml graph mst         --edges "..." --weights "1,2"
+  ml graph pagerank    --diedges "1-2,2-3" --alpha 0.85
+  ml graph components  --edges "..." [--weak|--strong]
+  ml graph degree      --edges "..."
+
+Graph spec:
+  --edges "1-2,2-3"    undirected
+  --diedges "1-2,2-3"  directed
+  --weights "1,2,3"
+
+Options:
+  --from N --to N  --method bfs|dijkstra  --alpha 0.85  --top K
+  --format json|table|csv
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "graph needs action and edges. ml graph info --edges \"1-2,2-3\""
+    forward_to "cli_graph" "$@"
+}
+
+# ─── 子命令: fit ───────────────────────────────────────────
+cmd_fit() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml fit <action> --xy "x1,y1,x2,y2,..." [options]
+Curve fitting and regression
+
+Actions:
+  ml fit poly    --degree 2 --xy "0,0,1,1,2,4"
+  ml fit exp     --xy "0,1,1,2.7,2,7.4"           → y=a*exp(b*x)
+  ml fit power   --xy "1,1,2,4,3,9"               → y=a*x^b
+  ml fit custom  --model "a*sin(b*x)+c" --params "a,b,c" --start "1,1,0" --xy ...
+  ml fit interp  --method spline --xy "..." --query "0.5,1.5"
+
+Data input:
+  --xy "x1,y1,x2,y2,..."      interleaved
+  --x "x1,x2" --y "y1,y2"     separate
+
+Options:
+  --predict "x1,x2,..."  --query "x1,x2,..."  --format json|table|csv
+
+Note: 'custom' requires Curve Fitting Toolbox license.
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "fit needs action and data. ml fit poly --degree 2 --xy \"0,0,1,1,2,4\""
+    forward_to "cli_fit" "$@"
+}
+
+# ─── 子命令: animate ───────────────────────────────────────
+cmd_animate() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml animate <action> --expr EXPR [options]
+Animation / video generation (GIF or MP4)
+
+Actions:
+  ml animate func  --expr "sin(x-0.5*t)" --xrange "[0 10]" --trange "[0 20]" --out out.gif
+  ml animate param --expr "sin(p*x)"     --xrange "[0 6]"  --prange "[0.5 3]" --out out.gif
+  ml animate trace --xexpr "cos(t)" --yexpr "sin(t)" --trange "[0 2*pi]" --out trail.mp4
+
+Expression variables:
+  func:  x (vector), t (scalar)
+  param: x (vector), p (scalar)
+  trace: t (scalar)
+
+Options:
+  --frames N    number of frames (default 30)
+  --fps N       frames per second (default 10)
+  --out PATH    .gif or .mp4 (default output.gif)
+  --title STR   plot title
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "animate needs action and expr. ml animate func --expr 'sin(x-0.5*t)' --xrange '[0 10]' --trange '[0 20]' --out out.gif"
+    forward_to "cli_animate" "$@"
 }
 
 # ─── 子命令: lint ──────────────────────────────────────────
@@ -859,6 +1010,10 @@ COMMANDS:
   ml info                   MATLAB environment info
   ml bench                  Performance benchmark
   ml lint     <file.m>      Code style check
+  ml lti     <action> --tf  LTI systems (poles/step/bode/margin)
+  ml graph   <action> --edges  Graph analysis (shortest/mst/pagerank)
+  ml fit     <action> --xy  Curve fitting (poly/exp/power/custom/interp)
+  ml animate <action> --expr  Animation/GIF/MP4 generation
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -925,6 +1080,10 @@ main() {
         bench)   cmd_bench "$@"   ;;
         lint)    cmd_lint "$@"    ;;
         fmt)     cmd_fmt "$@"     ;;
+        lti)     cmd_lti "$@"     ;;
+        graph)   cmd_graph "$@"   ;;
+        fit)     cmd_fit "$@"     ;;
+        animate) cmd_animate "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
