@@ -932,6 +932,61 @@ HELP
     forward_to "cli_animate" "$@"
 }
 
+# ─── 子命令: wavelet ───────────────────────────────────────
+cmd_wavelet() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml wavelet <action> --signal "x1,x2,..." [options]
+Wavelet analysis (Wavelet Toolbox required)
+
+Actions:
+  ml wavelet dwt      --signal "..." --wavelet db4 --level 3
+  ml wavelet denoise  --signal "..." --wavelet db4 --threshold -1 (auto)
+  ml wavelet families                       list wavelet families
+  ml wavelet info     --wavelet db4         wavelet properties
+  ml wavelet cwt      --signal "..." --wavelet morl --scales "1,2,4"
+
+Options:
+  --wavelet NAME  --level N  --threshold V  --mode sym|per|zpd
+  --scales "1,2,3"  --format json|table|csv
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 1 ]] && die "wavelet needs action. ml wavelet families"
+    forward_to "cli_wavelet" "$@"
+}
+
+# ─── 子命令: fuzzy ─────────────────────────────────────────
+cmd_fuzzy() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml fuzzy <action> --name FISNAME [options]
+Fuzzy inference system (Fuzzy Logic Toolbox required)
+
+Stateful: FIS is persisted in /tmp/ml_fuzzy_<name>.mat between calls.
+
+Actions (build pipeline):
+  ml fuzzy newfis  --name tipper
+  ml fuzzy addvar  --name tipper --var service --range "[0 10]" --type input
+  ml fuzzy addmf   --name tipper --var service --mf "poor:gaussmf:[1.5 0]"
+  ml fuzzy addrule --name tipper --rules "1,1,1,1,1; 2,0,2,1,1"
+
+Actions (query):
+  ml fuzzy eval    --name tipper --inputs "5,5"
+  ml fuzzy info    --name tipper
+  ml fuzzy surface --name tipper --out surf.png
+
+MF spec: "name:type:[params]"  e.g. "cold:trimf:[0 5 10]"
+Rule row: in_mf1,in_mf2,...,out_mf1,...,weight,operator (1=AND, 2=OR, 0=don't care)
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "fuzzy needs action. ml fuzzy newfis --name <name>"
+    forward_to "cli_fuzzy" "$@"
+}
+
 # ─── 子命令: lint ──────────────────────────────────────────
 cmd_lint() {
     local file=""
@@ -1014,6 +1069,8 @@ COMMANDS:
   ml graph   <action> --edges  Graph analysis (shortest/mst/pagerank)
   ml fit     <action> --xy  Curve fitting (poly/exp/power/custom/interp)
   ml animate <action> --expr  Animation/GIF/MP4 generation
+  ml wavelet <action> --signal  Wavelet analysis (dwt/denoise/cwt)
+  ml fuzzy   <action> --name    Fuzzy inference (Mamdani/rules/eval)
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -1084,6 +1141,8 @@ main() {
         graph)   cmd_graph "$@"   ;;
         fit)     cmd_fit "$@"     ;;
         animate) cmd_animate "$@" ;;
+        wavelet) cmd_wavelet "$@" ;;
+        fuzzy)   cmd_fuzzy "$@"   ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
