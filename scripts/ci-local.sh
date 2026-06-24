@@ -50,7 +50,10 @@ header "0. Environment"
 
 if [[ -x "$MATLAB_BIN" ]]; then
     ok "MATLAB binary: $MATLAB_BIN"
-    info "  $( "$MATLAB_BIN" -batch "fprintf('%s', version('-release'))" 2>/dev/null | grep -v Trial )"
+    # 快速模式跳过真实 MATLAB 调用,仅验证二进制存在
+    if [[ "$MODE" != "--fast" ]]; then
+        info "  $( "$MATLAB_BIN" -batch "fprintf('%s', version('-release'))" 2>/dev/null | grep -v Trial )"
+    fi
 else
     err "MATLAB not found at $MATLAB_BIN"
     exit 1
@@ -150,6 +153,34 @@ if [ -f "tests/test_ml_python_integration.sh" ]; then
     fi
 else
     warn "Integration test script not found"
+fi
+
+# ─── 6. Generate Report ───────────────────────────────────
+header "6. Generate CI Report"
+
+if [ -f "scripts/generate_report.py" ]; then
+    info "Generating test summary report..."
+    if python3 scripts/generate_report.py --local 2>/dev/null; then
+        if [ -f "report.md" ]; then
+            ok "Report generated: $(wc -l < report.md | tr -d ' ') lines"
+            # Show summary from report
+            python3 -c "
+import re
+with open('report.md') as f:
+    content = f.read()
+# Extract summary table
+match = re.search(r'## Summary\n(.*?)(?=\n##|\Z)', content, re.DOTALL)
+if match:
+    print(match.group(0))
+" 2>/dev/null || true
+        else
+            warn "Report file not found"
+        fi
+    else
+        warn "Report generation failed"
+    fi
+else
+    warn "generate_report.py not found"
 fi
 
 run_summary() {

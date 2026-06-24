@@ -660,6 +660,47 @@ REPL
     "$MATLAB_BIN" -nodesktop -nosplash -r "run('$startup');"
 }
 
+# ─── 子命令: ls ────────────────────────────────────────────
+cmd_ls() {
+    local dir="${1:-.}" pattern="${2:-*.m}"
+    echo "ml ls [dir] [pattern]"
+    echo ""
+    find "${dir}" -maxdepth 1 -name "${pattern}" -not -name ".*" 2>/dev/null \
+        | sort | while read f; do
+        local sz=$(wc -l < "$f" 2>/dev/null | tr -d ' ')
+        local name=$(basename "$f")
+        printf "  %4s lines  %s\n" "$sz" "$name"
+    done
+    echo ""
+    echo "Files: $(find "${dir}" -maxdepth 1 -name "${pattern}" -not -name ".*" 2>/dev/null | wc -l | tr -d ' ')"
+}
+
+# ─── 子命令: diff ──────────────────────────────────────────
+cmd_diff() {
+    local a="${1:-}" b="${2:-}"
+    [[ -z "$a" || -z "$b" ]] && die "diff needs two files. ml diff a.m b.m"
+    [[ ! -f "$a" ]] && die "file not found: $a"
+    [[ ! -f "$b" ]] && die "file not found: $b"
+    diff -u "$a" "$b" || true
+}
+
+# ─── 子命令: profile ──────────────────────────────────────
+cmd_profile() {
+    local file="" fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            -h|--help) echo "Usage: ml profile <script.m> [--json|--table]"; return 0 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+    [[ -z "$file" ]] && die "profile needs script: ml profile script.m"
+    [[ ! -f "$file" ]] && die "file not found: $file"
+    local abs="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+    run_matlab "$(format_result "cli_profile('${abs}')" "${fmt}")"
+}
+
 # ─── 子命令: lint ──────────────────────────────────────────
 cmd_lint() {
     local file=""
@@ -730,6 +771,9 @@ COMMANDS:
   ml export   <f.mat>       Export .mat to csv/json/txt
   ml test     [dir]         Run MATLAB unit tests
   ml repl                   Interactive REPL (terminal)
+  ml ls      [dir] [pat]   List .m/.mat files with line counts
+  ml diff    <a.m> <b.m>   Diff two MATLAB scripts
+  ml profile <script.m>     Performance profile (--json)
   ml info                   MATLAB environment info
   ml bench                  Performance benchmark
   ml lint     <file.m>      Code style check
@@ -789,6 +833,9 @@ main() {
         export) cmd_export "$@" ;;
         test)   cmd_test "$@"   ;;
         repl)   cmd_repl "$@"   ;;
+        ls)     cmd_ls "$@"     ;;
+        diff)   cmd_diff "$@"   ;;
+        profile) cmd_profile "$@" ;;
         mat)     cmd_mat "$@"     ;;
         info)    cmd_info "$@"    ;;
         bench)   cmd_bench "$@"   ;;
