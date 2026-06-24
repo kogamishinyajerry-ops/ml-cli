@@ -416,6 +416,28 @@ HELP
     run_matlab "$(format_result "cli_sym('${op}','${expr}'${extra_args})" "${fmt}")"
 }
 
+# ─── 子命令: par ──────────────────────────────────────────
+cmd_par() {
+    local fmt="text" op="info"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)    fmt="json";  shift ;;
+            --table)   fmt="table"; shift ;;
+            --info)    op="info";   shift ;;
+            --bench)   op="bench";  shift ;;
+            --gpu)     op="gpu";    shift ;;
+            -h|--help)
+                echo "ml par [--info|--bench|--gpu] [--json|--table]"
+                echo "  --info   Show parallel pool and CPU/GPU status"
+                echo "  --bench  Benchmark parallel vs serial performance"
+                echo "  --gpu    Show GPU information"
+                return 0 ;;
+            *) shift ;;
+        esac
+    done
+    run_matlab "$(format_result "cli_par('${op}')" "${fmt}")"
+}
+
 # ─── 子命令: optimize ─────────────────────────────────────
 cmd_optimize() {
     local problem="rosenbrock" fmt="text"
@@ -818,6 +840,7 @@ COMMANDS:
   ml control  <tf>          Control systems (--bode --nyquist)
   ml aero     [--alt H]     Aerospace calculations (ISA, Mach)
   ml sym      <op> <expr>   Symbolic math (diff/int/solve/laplace/...)
+  ml par      [--info]      Parallel computing (bench/gpu/workers)
   ml stats    <data.csv>    Statistical analysis (--json)
   ml optimize [--problem]   Optimization (--rosenbrock --himmelblau)
   ml solve    [--ode]       ODE solver (--vanderpol --lorenz --lotka)
@@ -882,6 +905,7 @@ main() {
         control) cmd_control "$@" ;;
         aero)    cmd_aero "$@"    ;;
         sym)     cmd_sym "$@"     ;;
+        par)     cmd_par "$@"     ;;
         stats)   cmd_stats "$@"   ;;
         optimize) cmd_optimize "$@" ;;
         solve)   cmd_solve "$@"   ;;
