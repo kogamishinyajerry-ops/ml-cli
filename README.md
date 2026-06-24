@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-49-blue)
+![Commands](https://img.shields.io/badge/commands-50-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -56,7 +56,7 @@ ml wavelet families                       # list 13 wavelet families
 ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 ```
 
-## Commands (49)
+## Commands (50)
 
 ### Core
 
@@ -111,6 +111,7 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml vehicle <act>` | Vehicle dynamics (bicycle/Pacejka) | Base MATLAB | ✓ |
 | `ml audio <act> <file>` | Audio analysis (pitch/formant/spectrogram) | Audio | ✓ |
 | `ml lidar <act> <cloud>` | Point cloud (segment/cluster/fit) | Lidar | ✓ |
+| `ml ml <act> <data>` | Machine learning (classify/cluster/pca/cv) | Statistics & ML | ✓ |
 
 ### Advanced
 
@@ -346,6 +347,20 @@ ml lidar fit        scan.pcd --shape plane --maxdist 0.05            # RANSAC pl
 ml lidar view       scan.pcd --out plot.png                          # visualize
 ```
 
+### `ml ml` — Machine Learning
+
+```bash
+ml ml classify  data.csv --target label --method forest            # train + eval
+ml ml regress   data.csv --target y    --method tree               # regression
+ml ml cluster   data.csv --k 3                                      # kmeans + silhouette
+ml ml pca       data.csv --components 2                             # PCA + explained %
+ml ml split     data.csv --ratio 0.8                                # train/test files
+ml ml train     data.csv --target label --save model.mat           # full-fit + save
+ml ml predict   model.mat new.csv --out preds.csv                  # batch predict
+ml ml cv        data.csv --target label --method knn --folds 5     # k-fold CV
+ml ml features  data.csv --target label                            # importance ranking
+```
+
 ## Pipeline Examples
 
 ```bash
@@ -466,6 +481,10 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.5** (2026-06-24): `ml ml` machine learning command.
+  9 actions — classify (tree/forest/svm/knn/nb/logistic), regress (tree/forest/svm/linear/gp),
+  cluster (kmeans + silhouette), pca, train/test split, train+save, predict (load .mat),
+  k-fold CV, feature importance ranking. **50 commands total.**
 - **v0.3.4** (2026-06-24): `robot`, `vehicle`, `audio`, `lidar` commands.
   4 new engineering modules — robotics (DH kinematics, IK, Jacobian, trajectory),
   vehicle dynamics (bicycle model, Pacejka tire, step/lane-change maneuvers),

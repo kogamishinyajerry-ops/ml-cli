@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.4
+# ml — MATLAB CLI Tool  v0.3.5
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.4"
+readonly VERSION="0.3.5"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1201,6 +1201,34 @@ EOF
     forward_to "cli_lidar" "$@"
 }
 
+# ─── 子命令: ml ml ──────────────────────────────────────────
+cmd_ml() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml ml — Machine Learning (classify/regress/cluster/pca/cv/predict)
+
+Actions:
+  ml ml classify  <data.csv> --target label --method tree      train + evaluate
+  ml ml regress   <data.csv> --target y --method svm           regression
+  ml ml cluster   <data.csv> --k 3                             kmeans clustering
+  ml ml pca       <data.csv> --components 2                    PCA
+  ml ml split     <data.csv> --ratio 0.8                       train/test split
+  ml ml train     <data.csv> --target label --method forest --save model.mat
+  ml ml predict   model.mat <new.csv> [--out preds.csv]
+  ml ml cv        <data.csv> --target label --method knn --folds 5
+  ml ml features  <data.csv> --target label                    importance ranking
+
+Methods: tree|forest|svm|knn|nb|linear|logistic (classify)
+         tree|forest|svm|linear|gp (regress)
+Options: --k N --components N --ratio R --folds N --save PATH --out PATH
+         --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_ml" "$@"
+}
+
 # ─── 子命令: cv ─────────────────────────────────────────────
 cmd_cv() {
     case "$1" in
@@ -1371,6 +1399,7 @@ COMMANDS:
   ml vehicle <action>           Vehicle Dynamics (pacejka/steer/lanechange/straight/road)
   ml audio  <action> <file>     Audio (info/spectrogram/pitch/formant/noise/synth)
   ml lidar  <action> <cloud>    Point Cloud (info/downsample/segment/cluster/fit/view)
+  ml ml     <action> <data>     Machine Learning (classify/regress/cluster/pca/cv)
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -1455,6 +1484,7 @@ main() {
         vehicle) cmd_vehicle "$@" ;;
         audio)   cmd_audio "$@"   ;;
         lidar)   cmd_lidar "$@"   ;;
+        ml)      cmd_ml "$@"      ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
