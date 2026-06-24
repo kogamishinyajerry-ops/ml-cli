@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.7
+# ml — MATLAB CLI Tool  v0.3.8
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.7"
+readonly VERSION="0.3.8"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1294,6 +1294,101 @@ EOF
     forward_to "cli_struct" "$@"
 }
 
+# ─── 子命令: ml text ─────────────────────────────────────────
+cmd_text() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml text — Text Processing (Tokenize/Stats/Regex/Sentiment/Keywords/Ngrams)
+
+Actions:
+  ml text tokenize  --input "hello world from matlab"
+  ml text stats     --input "the quick brown fox jumps over the lazy dog."
+  ml text regex     --input "phone: 555-1234" --pattern "(\d+)-(\d+)"
+  ml text sentiment --input "this product is amazing"
+  ml text keywords  --input "matlab rocks. matlab forever." --top 3
+  ml text ngrams    --input "the quick brown fox" --n 2
+
+Options: --input STR --file PATH --pattern REGEX --top N --n N --stopwords 1
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_text" "$@"
+}
+
+# ─── 子命令: ml finance ──────────────────────────────────────
+cmd_finance() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml finance — Financial Analysis (Options/Portfolio/VaR/Bond/Amort/IRR/NPV)
+
+Actions:
+  ml finance options  --type call --S 100 --K 105 --T 1 --r 0.05 --sigma 0.2
+  ml finance portfolio --returns "[0.04 0.02; 0.02 0.09]" --target 0.1
+  ml finance var      --returns "[0.01 -0.02 0.03 ...]" --conf 0.95
+  ml finance bond     --face 1000 --coupon 0.05 --yield 0.04 --maturity 10
+  ml finance amort    --principal 200000 --rate 0.04 --years 30
+  ml finance irr      --cashflows "[-1000 300 400 500]"
+  ml finance npv      --cashflows "[-1000 300 400 500]" --r 0.1
+
+Options: --type call|put --S --K --T --r --sigma --q --returns MATRIX
+         --target RET --conf P --face --coupon --yield --maturity
+         --principal --rate --years --cashflows VEC
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_finance" "$@"
+}
+
+# ─── 子命令: ml map ──────────────────────────────────────────
+cmd_map() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml map — Geographic (Distance/GreatCircle/Bearing/Points/Geocode/Timezone)
+
+Actions:
+  ml map distance     --lat1 40.71 --lon1 -74.01 --lat2 34.05 --lon2 -118.24 --units MI
+  ml map greatcircle  --lat1 51.5 --lon1 -0.1 --lat2 35.7 --lon2 139.7
+  ml map bearing      --lat1 0 --lon1 0 --lat2 1 --lon2 1
+  ml map points       --lats "[40.7 34.0]" --lons "[-74 -118]"
+  ml map geocode      --address Tokyo
+  ml map timezone     --lat 40.7 --lon -74.0
+
+Options: --lat1 --lon1 --lat2 --lon2 --lat --lon --lats VEC --lons VEC
+         --labels CELL --address STR --units KM|MI
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_map" "$@"
+}
+
+# ─── 子命令: ml image ────────────────────────────────────────
+cmd_image() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml image — Image Processing (Info/Hist/Edge/Filter/Segment/Morph/Convert)
+
+Actions:
+  ml image info     --file photo.jpg
+  ml image hist     --file photo.jpg --bins 32
+  ml image edge     --file photo.jpg --method canny --threshold 0.1
+  ml image filter   --file photo.jpg --filter gaussian --size 5
+  ml image segment  --file photo.jpg --k 4
+  ml image morph    --file binary.png --op dilate --radius 2
+  ml image convert  --file photo.jpg --format png --out out.png
+
+Options: --file PATH --out PATH --method sobel|prewitt|canny|roberts
+         --filter gaussian|median|mean|unsharp --size N --threshold V
+         --bins N --k N --op erode|dilate|open|close --radius N --format NAME
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_image" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -1591,6 +1686,10 @@ main() {
         time)    cmd_time "$@"    ;;
         power)   cmd_power "$@"   ;;
         struct)  cmd_struct "$@"  ;;
+        text)    cmd_text "$@"    ;;
+        finance) cmd_finance "$@" ;;
+        map)     cmd_map "$@"     ;;
+        image)   cmd_image "$@"   ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }

@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-54-blue)
+![Commands](https://img.shields.io/badge/commands-58-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -116,6 +116,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml time <act> <series>` | Time-series (ACF/forecast/ARIMA) | Base MATLAB | ✓ |
 | `ml power <act>` | Power systems (loadflow/fault/line) | Base MATLAB | ✓ |
 | `ml struct <act>` | Structural mechanics (beam/modal/truss) | Base MATLAB | ✓ |
+| `ml text <act> --input` | NLP (tokenize/stats/regex/sentiment) | Base MATLAB | ✓ |
+| `ml finance <act>` | Finance (options/portfolio/VaR/bond/IRR) | Base MATLAB | ✓ |
+| `ml map <act> --lat/--lon` | Geo (distance/greatcircle/geocode) | Base MATLAB | ✓ |
+| `ml image <act> --file` | Image processing (edge/filter/segment) | Image Processing | ✓ |
 
 ### Advanced
 
@@ -411,6 +415,88 @@ ml struct modal   --E 200e9 --I 1e-4 --rho 7850 --A 0.01 --length 5 --modes 3
 ml struct truss   --nodes "[0 0; 4 0; 2 3]" --members "[1 2; 1 3; 2 3]" --forces "..." --fixity "..."
 ```
 
+### `ml text` — Text Processing
+
+```bash
+ml text tokenize  --input "hello world from matlab"
+ml text stats     --input "the quick brown fox jumps over the lazy dog."
+ml text regex     --input "phone: 555-1234, zip: 94040" --pattern "(\d+)-(\d+)"
+ml text sentiment --input "this product is amazing and wonderful"
+ml text keywords  --input "matlab is great. matlab rocks." --top 3 --stopwords 1
+ml text ngrams    --input "the quick brown fox jumps" --n 2
+```
+
+### `ml finance` — Financial Analysis
+
+```bash
+# Black-Scholes option pricing with full Greeks
+ml finance options  --type call --S 100 --K 105 --T 1 --r 0.05 --sigma 0.2
+
+# Markowitz mean-variance portfolio
+ml finance portfolio --returns "[0.04 0.02; 0.02 0.09]" --target 0.1
+
+# Historical Value-at-Risk + expected shortfall
+ml finance var      --returns "[0.01 -0.02 0.03 ...]" --conf 0.95
+
+# Bond pricing with duration + convexity
+ml finance bond     --face 1000 --coupon 0.05 --yield 0.04 --maturity 10
+
+# Loan amortization schedule
+ml finance amort    --principal 200000 --rate 0.04 --years 30
+
+# Newton-Raphson IRR + NPV
+ml finance irr      --cashflows "[-1000 300 400 500]"
+ml finance npv      --cashflows "[-1000 300 400 500]" --r 0.1
+```
+
+### `ml map` — Geographic Calculations
+
+```bash
+# Haversine distance (NYC → LA)
+ml map distance    --lat1 40.7128 --lon1 -74.0060 --lat2 34.0522 --lon2 -118.2437 --units MI
+
+# Great-circle waypoints (London → Tokyo)
+ml map greatcircle --lat1 51.5 --lon1 -0.1 --lat2 35.7 --lon2 139.7
+
+# Initial bearing + cardinal direction
+ml map bearing     --lat1 0 --lon1 0 --lat2 1 --lon2 1
+
+# Multi-point centroid + bounding box
+ml map points      --lats "[40.7 34.0 51.5]" --lons "[-74 -118 -0.1]"
+
+# Offline city geocoder (12 major cities built-in)
+ml map geocode     --address "New York"
+
+# Rough longitude-based timezone estimate
+ml map timezone    --lat 40.7 --lon -74.0
+```
+
+### `ml image` — Image Processing
+
+```bash
+# Image metadata + statistics
+ml image info     --file photo.jpg
+
+# Intensity histogram
+ml image hist     --file photo.jpg --bins 32
+
+# Edge detection (Sobel/Prewitt/Roberts/Canny)
+ml image edge     --file photo.jpg --method sobel --threshold 0.1
+
+# Spatial filtering
+ml image filter   --file photo.jpg --filter gaussian --size 5
+ml image filter   --file photo.jpg --filter unsharp --size 5
+
+# K-means intensity segmentation
+ml image segment  --file photo.jpg --k 4
+
+# Binary morphology (erode/dilate/open/close)
+ml image morph    --file binary.png --op dilate --radius 2
+
+# Format conversion
+ml image convert  --file photo.jpg --format png --out out.png
+```
+
 ## Pipeline Examples
 
 ```bash
@@ -531,6 +617,20 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.8** (2026-06-25): `text`, `finance`, `map`, `image` commands.
+  Wave 8 — 4 new modules: text processing (tokenize, stats with Flesch reading
+  ease, regex match with token groups, lexicon-based sentiment, TF keyword
+  extraction with stopword filtering, n-gram generation), financial analysis
+  (Black-Scholes-Merton option pricing with full Greeks, Markowitz
+  mean-variance portfolio optimization, historical VaR + expected shortfall,
+  bond pricing with Macaulay/modified duration + convexity, loan amortization,
+  Newton-Raphson IRR, NPV), geographic (Haversine distance, spherical
+  great-circle waypoints, initial bearing + cardinal, multi-point centroid/BBox,
+  offline city geocoder, longitude-based timezone estimate), and image
+  processing (metadata, histogram, Sobel/Prewitt/Roberts/Canny edge detection,
+  Gaussian/mean/median/unsharp filtering, k-means intensity segmentation,
+  binary erode/dilate/open/close morphology, format conversion).
+  **58 commands total.**
 - **v0.3.7** (2026-06-24): `comms`, `time`, `power`, `struct` commands.
   Wave 7 — 4 new engineering modules: digital communications (QAM/PSK/FSK mod,
   BER sim, AWGN/Rayleigh channel, eye diagram, PSD), time-series (ACF, seasonal
