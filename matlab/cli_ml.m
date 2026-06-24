@@ -9,6 +9,9 @@ function cli_ml(action, varargin)
 %         ml ml predict   model.mat <new.csv> --out preds.csv
 %         ml ml cv        <data.csv> --target label --method knn --folds 5
 %         ml ml features  <data.csv>                          # rank by importance
+%         ml ml dnn       <data.csv> --target label --layers "10,8" --epochs 50
+%         ml ml dnpredict model.mat <new.csv>                 # DNN inference
+%         ml ml dninfo    model.mat                           # inspect net
 %
 %   Options:
 %     --target COL    target column name (or index)
@@ -19,13 +22,18 @@ function cli_ml(action, varargin)
 %     --folds N       cross-validation folds (default 5)
 %     --save PATH     save trained model
 %     --out PATH      output file
+%     --layers S      DNN hidden layers as "h1,h2,..." (e.g. "10,8,5")
+%     --epochs N      DNN training epochs (default 50)
+%     --lr VAL        DNN initial learning rate (default 0.01)
+%     --task NAME     DNN task: class|reg (inferred from target if omitted)
 %     --format json|table|csv
 
     if nargin < 1, error('ml ml <action> [options]'); end
 
     opts = struct('format','json','target','','method','tree', ...
                   'k',3,'components',2,'ratio',0.8,'folds',5, ...
-                  'save','','out','','file','','file2','');
+                  'save','','out','','file','','file2','', ...
+                  'layers','10,8','epochs',50,'lr',0.01,'task','');
     i = 1;
     while i <= numel(varargin)
         tok = varargin{i};
@@ -38,6 +46,10 @@ function cli_ml(action, varargin)
             case '--folds',      opts.folds = round(parse_num(varargin{i+1})); i=i+2;
             case '--save',       opts.save = varargin{i+1}; i=i+2;
             case '--out',        opts.out = varargin{i+1}; i=i+2;
+            case '--layers',     opts.layers = varargin{i+1}; i=i+2;
+            case '--epochs',     opts.epochs = round(parse_num(varargin{i+1})); i=i+2;
+            case '--lr',         opts.lr = parse_num(varargin{i+1}); i=i+2;
+            case '--task',       opts.task = varargin{i+1}; i=i+2;
             case '--format',     opts.format = varargin{i+1}; i=i+2;
             otherwise,            if isempty(opts.file), opts.file = tok; ...
                                   elseif isempty(opts.file2), opts.file2 = tok; end, i=i+1;
@@ -55,6 +67,9 @@ function cli_ml(action, varargin)
             case 'predict',   out = act_predict(opts);
             case 'cv',        out = act_cv(opts);
             case 'features',  out = act_features(opts);
+            case 'dnn',       out = act_dnn(opts);
+            case 'dnpredict', out = act_dnpredict(opts);
+            case 'dninfo',    out = act_dninfo(opts);
             otherwise,        error('unknown action: %s', action);
         end
         print_output(out, opts.format);
@@ -379,6 +394,239 @@ function out = act_features(opts)
         out.rankedFeatures = colNames(sortedIdx);
         out.rankedImportance = sortedImp;
     end
+end
+
+% =================== DNN actions ===================
+function out = act_dnn(opts)
+    % Deep neural network training via trainNetwork (Deep Learning Toolbox)
+    if exist('trainNetwork','file') ~= 2
+        error('Deep Learning Toolbox not available');
+    end
+    [X, y, colNames, ~] = load_data(opts);
+    n = size(X, 1);
+    splitIdx = round(opts.ratio * n);
+    Xtr = X(1:splitIdx, :); ytr = y(1:splitIdx);
+    Xte = X(splitIdx+1:end, :); yte = y(splitIdx+1:end);
+
+    % Determine task: classification if target is integer-valued, else regression
+    task = lower(opts.task);
+    if isempty(task)
+        isIntegerLike = all(y == round(y)) && numel(unique(y)) < min(50, n/4);
+        if isIntegerLike, task = 'class'; else, task = 'reg'; end
+    end
+
+    % Parse hidden layers from "10,8,5"
+    hiddenSizes = parse_layers(opts.layers);
+    numFeatures = size(X, 2);
+
+    % Build layer graph
+    layers = build_dnn_layers(numFeatures, hiddenSizes, task, ytr);
+    out_layers = struct();
+    out_layers.inputSize = numFeatures;
+    out_layers.hiddenLayers = hiddenSizes;
+    out_layers.task = task;
+
+    % Training options
+    if strcmp(task, 'class')
+        classes = unique(ytr);
+        % Y must be categorical for classification
+        Ytr_cat = categorical(ytr);
+        options = trainingOptions('adam', ...
+            'InitialLearnRate', opts.lr, ...
+            'MaxEpochs', opts.epochs, ...
+            'MiniBatchSize', max(8, min(128, round(size(Xtr,1)/4))), ...
+            'Shuffle', 'every-epoch', ...
+            'ExecutionEnvironment', 'cpu', ...
+            'Plots', 'none', ...
+            'Verbose', false);
+        net = trainNetwork(Xtr, Ytr_cat, layers, options);
+        % Predict
+        Yte_pred = predict(net, Xte);
+        [~, yhat] = max(Yte_pred, [], 2);
+        classLabels = categories(Ytr_cat);
+        yhatLabel = classLabels(yhat)';
+        acc = mean(yhatLabel == categorical(yte));
+        out = struct();
+        out.action = 'dnn';
+        out.task = 'classification';
+        out.architecture = [numFeatures, hiddenSizes, numel(classes)];
+        out.numTrainSamples = size(Xtr, 1);
+        out.numTestSamples = size(Xte, 1);
+        out.epochs = opts.epochs;
+        out.classes = classes;
+        out.accuracy = acc;
+        out.predictions = yhatLabel;
+    else
+        % Regression
+        options = trainingOptions('adam', ...
+            'InitialLearnRate', opts.lr, ...
+            'MaxEpochs', opts.epochs, ...
+            'MiniBatchSize', max(8, min(128, round(size(Xtr,1)/4))), ...
+            'Shuffle', 'every-epoch', ...
+            'ExecutionEnvironment', 'cpu', ...
+            'Plots', 'none', ...
+            'Verbose', false);
+        net = trainNetwork(Xtr, ytr, layers, options);
+        yhat = predict(net, Xte);
+        rmse_val = sqrt(mean((yhat - yte).^2));
+        mae_val = mean(abs(yhat - yte));
+        r2 = 1 - sum((yte - yhat).^2) / sum((yte - mean(yte)).^2);
+        out = struct();
+        out.action = 'dnn';
+        out.task = 'regression';
+        out.architecture = [numFeatures, hiddenSizes, 1];
+        out.numTrainSamples = size(Xtr, 1);
+        out.numTestSamples = size(Xte, 1);
+        out.epochs = opts.epochs;
+        out.RMSE = rmse_val;
+        out.MAE = mae_val;
+        out.R2 = r2;
+        out.predictions = yhat(:)';
+    end
+    if ~isempty(colNames), out.featureNames = colNames; end
+    % Save model
+    saveFile = opts.save;
+    if isempty(saveFile), saveFile = '/tmp/ml_dnn.mat'; end
+    save(saveFile, 'net');
+    out.modelFile = saveFile;
+end
+
+function out = act_dnpredict(opts)
+    if isempty(opts.file), error('model file required'); end
+    if isempty(opts.file2), error('data file required'); end
+    loaded = load(opts.file);
+    if ~isfield(loaded, 'net'), error('no net variable in model file'); end
+    net = loaded.net;
+    [data, colNames] = read_csv_with_header(opts.file2);
+    numFeatures = net.Layers(1).InputSize;
+    if size(data, 2) > numFeatures
+        data = data(:, 1:numFeatures);
+    end
+    yhat_scores = predict(net, data);
+    if ismatrix(yhat_scores) && size(yhat_scores, 2) > 1
+        % Classification: return class with max prob + probabilities
+        [maxScore, maxIdx] = max(yhat_scores, [], 2);
+        try
+            classLabels = categories(net.Layers(end).Classes);
+        catch
+            classLabels = (1:size(yhat_scores, 2))';
+        end
+        predLabels = classLabels(maxIdx);
+        out = struct();
+        out.modelFile = opts.file;
+        out.dataFile = opts.file2;
+        out.task = 'classification';
+        out.numSamples = size(data, 1);
+        out.predictions = predLabels(:)';
+        out.confidences = maxScore(:)';
+        out.classes = classLabels;
+    else
+        % Regression
+        out = struct();
+        out.modelFile = opts.file;
+        out.dataFile = opts.file2;
+        out.task = 'regression';
+        out.numSamples = size(data, 1);
+        out.predictions = yhat_scores(:)';
+    end
+    if ~isempty(opts.out)
+        % Always write numeric predictions as a column
+        if isfield(out, 'classes')
+            % categorical labels -> numeric codes via categories() match
+            classCats = out.classes;
+            predNum = zeros(numel(predLabels), 1);
+            for kk = 1:numel(predLabels)
+                idx = find(strcmp(classCats, char(predLabels(kk))), 1);
+                if isempty(idx), idx = 1; end
+                predNum(kk) = idx;
+            end
+        else
+            predNum = yhat_scores(:);
+        end
+        write_csv_with_header(opts.out, [data, predNum], ...
+            {colNames{1:numFeatures}, 'prediction'});
+        out.outputFile = opts.out;
+    end
+end
+
+function out = act_dninfo(opts)
+    if isempty(opts.file), error('model file required'); end
+    loaded = load(opts.file);
+    if ~isfield(loaded, 'net'), error('no net variable in model file'); end
+    net = loaded.net;
+    layers = net.Layers;
+    numLayers = numel(layers);
+    layerNames = cell(numLayers, 1);
+    layerTypes = cell(numLayers, 1);
+    layerSizes = zeros(numLayers, 1);
+    for k = 1:numLayers
+        layerNames{k} = layers(k).Name;
+        layerTypes{k} = class(layers(k));
+        if isprop(layers(k), 'OutputSize') && ~isempty(layers(k).OutputSize)
+            sz = layers(k).OutputSize;
+            if isnumeric(sz) && numel(sz) <= 2
+                layerSizes(k) = prod(sz);
+            end
+        elseif isprop(layers(k), 'NumClasses')
+            layerSizes(k) = layers(k).NumClasses;
+        end
+    end
+    out = struct();
+    out.modelFile = opts.file;
+    out.numLayers = numLayers;
+    out.layerNames = layerNames(:)';
+    out.layerTypes = layerTypes(:)';
+    out.layerSizes = layerSizes';
+    % Count params
+    totalParams = 0;
+    try
+        for k = 1:numLayers
+            if isprop(layers(k), 'Weights') && ~isempty(layers(k).Weights)
+                totalParams = totalParams + numel(layers(k).Weights) + numel(layers(k).Bias);
+            end
+        end
+    catch
+    end
+    out.totalParams = totalParams;
+    if isprop(net, 'NetworkType')
+        out.networkType = net.NetworkType;
+    end
+end
+
+% =================== DNN Helpers ===================
+function hiddenSizes = parse_layers(s)
+    if ischar(s) || isstring(s)
+        parts = strsplit(s, ',');
+        hiddenSizes = zeros(1, numel(parts));
+        for k = 1:numel(parts)
+            hiddenSizes(k) = round(str2double(strtrim(parts{k})));
+        end
+    else
+        hiddenSizes = s;
+    end
+    if any(~isfinite(hiddenSizes)) || isempty(hiddenSizes)
+        error('invalid --layers: %s (expected "10,8,5" format)', s);
+    end
+end
+
+function layers = build_dnn_layers(numFeatures, hiddenSizes, task, ytr)
+    l = {};
+    l{end+1} = featureInputLayer(numFeatures, 'Name', 'input');
+    for k = 1:numel(hiddenSizes)
+        l{end+1} = fullyConnectedLayer(hiddenSizes(k), ...
+            'Name', sprintf('fc%d', k));
+        l{end+1} = reluLayer('Name', sprintf('relu%d', k));
+    end
+    if strcmp(task, 'class')
+        classes = unique(ytr);
+        l{end+1} = fullyConnectedLayer(numel(classes), 'Name', 'fc_out');
+        l{end+1} = softmaxLayer('Name', 'softmax');
+        l{end+1} = classificationLayer('Name', 'classoutput');
+    else
+        l{end+1} = fullyConnectedLayer(1, 'Name', 'fc_out');
+        l{end+1} = regressionLayer('Name', 'regoutput');
+    end
+    layers = [l{:}];
 end
 
 % =================== Helpers ===================

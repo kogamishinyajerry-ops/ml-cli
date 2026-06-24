@@ -359,6 +359,9 @@ ml ml train     data.csv --target label --save model.mat           # full-fit + 
 ml ml predict   model.mat new.csv --out preds.csv                  # batch predict
 ml ml cv        data.csv --target label --method knn --folds 5     # k-fold CV
 ml ml features  data.csv --target label                            # importance ranking
+ml ml dnn       data.csv --target label --layers "10,8" --epochs 50 # DNN train
+ml ml dnpredict model.mat new.csv --out preds.csv                   # DNN inference
+ml ml dninfo    model.mat                                           # inspect network
 ```
 
 ## Pipeline Examples
@@ -481,6 +484,11 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.6** (2026-06-24): `ml ml dnn` deep neural network extension.
+  3 new actions — dnn (train classification/regression with customizable
+  architecture "h1,h2,..."), dnpredict (inference with confidence scores),
+  dninfo (layer/parameter inspection). Uses Deep Learning Toolbox
+  (featureInputLayer + fullyConnectedLayer + reluLayer + trainNetwork).
 - **v0.3.5** (2026-06-24): `ml ml` machine learning command.
   9 actions — classify (tree/forest/svm/knn/nb/logistic), regress (tree/forest/svm/linear/gp),
   cluster (kmeans + silhouette), pca, train/test split, train+save, predict (load .mat),

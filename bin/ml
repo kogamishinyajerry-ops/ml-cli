@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.5
+# ml — MATLAB CLI Tool  v0.3.6
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.5"
+readonly VERSION="0.3.6"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1217,10 +1217,15 @@ Actions:
   ml ml train     <data.csv> --target label --method forest --save model.mat
   ml ml predict   model.mat <new.csv> [--out preds.csv]
   ml ml cv        <data.csv> --target label --method knn --folds 5
+  ml ml features  <data.csv> --target label
+  ml ml dnn       <data.csv> --target label --layers "10,8" --epochs 50
+  ml ml dnpredict model.mat <new.csv>
+  ml ml dninfo    model.mat
   ml ml features  <data.csv> --target label                    importance ranking
 
 Methods: tree|forest|svm|knn|nb|linear|logistic (classify)
          tree|forest|svm|linear|gp (regress)
+         dnn: --layers "10,8" --epochs N --lr VAL --task class|reg
 Options: --k N --components N --ratio R --folds N --save PATH --out PATH
          --format json|table|csv
 EOF
