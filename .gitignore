@@ -1,0 +1,27 @@
+# MATLAB artifacts
+*.asv
+*.m~
+*.mat
+ml_plot_*.png
+*.mlx~
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# CI temp files
+/tmp/ml_ci_*
+/tmp/ml_test*
+/tmp/ml_cli_*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

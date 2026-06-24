@@ -1,0 +1,383 @@
+# =============================================================================
+# ml-cli GitLab CI/CD Pipeline
+# =============================================================================
+# 支持两种运行器:
+#   1. matlab-runner (tag)  — 自托管,已安装 MATLAB
+#   2. docker-runner (tag)  — Docker Executor, python-only 测试
+# =============================================================================
+
+stages:
+  - setup
+  - test
+  - integration
+  - report
+
+# ─── 全局变量 ──────────────────────────────────────────────────
+variables:
+  MATLAB_BIN: "/Applications/MATLAB_R2026a.app/bin/matlab"
+  ML_CLI_DIR: "$CI_PROJECT_DIR"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONUNBUFFERED: "1"
+
+# ─── 缓存 ──────────────────────────────────────────────────────
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .cache/pip/
+    - .cache/matlab/
+
+# ─── 默认配置 ──────────────────────────────────────────────────
+default:
+  before_script:
+    - export PATH="$CI_PROJECT_DIR/bin:$PATH"
+    - chmod +x bin/ml scripts/*.sh tests/*.sh 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════
+# Stage 1: Setup — 环境验证
+# ═══════════════════════════════════════════════════════════════
+
+check-environment:
+  stage: setup
+  image: python:3.12-slim
+  script:
+    - echo "=== GitLab CI Environment ==="
+    - echo "Pipeline: $CI_PIPELINE_ID"
+    - echo "Branch: $CI_COMMIT_REF_NAME"
+    - echo "Commit: $CI_COMMIT_SHORT_SHA"
+    - python3 --version
+    - pip install numpy scipy pandas --quiet
+    - python3 -c "import numpy; print(f'numpy {numpy.__version__}')"
+    - python3 -c "import scipy; print(f'scipy {scipy.__version__}')"
+    - pip freeze | grep -E "numpy|scipy|pandas"
+  artifacts:
+    paths:
+      - .cache/pip/
+    expire_in: 1 hour
+
+check-matlab:
+  stage: setup
+  tags:
+    - matlab-runner
+  allow_failure: true
+  script:
+    - |
+      if [ -x "$MATLAB_BIN" ]; then
+        echo "MATLAB found: $MATLAB_BIN"
+        "$MATLAB_BIN" -batch "fprintf('MATLAB %s\n', version('-release'))" 2>&1 | tail -1
+        "$MATLAB_BIN" -batch "fprintf('Toolboxes: %d\n', numel(ver))" 2>&1 | tail -1
+      else
+        echo "WARNING: MATLAB not found at $MATLAB_BIN"
+        echo "Set up a matlab-runner or update MATLAB_BIN variable"
+        exit 0
+      fi
+  artifacts:
+    reports:
+      dotenv: matlab.env
+
+# ═══════════════════════════════════════════════════════════════
+# Stage 2: Test — 单元测试
+# ═══════════════════════════════════════════════════════════════
+
+unit-tests:
+  stage: test
+  tags:
+    - matlab-runner
+  needs: ["check-matlab"]
+  allow_failure: false
+  script:
+    - echo "=== Running ml Command Tests ==="
+    - |
+      echo ":: core eval"
+      ml eval "1+1" | grep -q "2" || exit 1
+
+      echo ":: matrix"
+      ml eval "eye(2)" | grep -q "1" || exit 1
+
+      echo ":: JSON output"
+      ml eval --json "[1 2;3 4]" | grep -q "\[" || exit 1
+
+      echo ":: TABLE output"
+      ml eval --table "magic(2)" | grep -q "|" || exit 1
+
+      echo ":: CSV output"
+      ml eval --csv "[1 2;3 4]" | grep -q "," || exit 1
+
+      echo ":: error handling"
+      ml eval "bad_func()" 2>/dev/null && exit 1 || echo "error exit OK"
+
+      echo ":: convert"
+      test "$(ml convert 1 km m 2>/dev/null | tail -1 | tr -d ' ')" = "1000" || exit 1
+
+      echo ":: info"
+      ml info 2>&1 | head -3 | grep -q "MATLAB" || exit 1
+
+      echo ":: bench"
+      ml bench 2>&1 | grep -q "matrix" || exit 1
+    - echo "All unit tests passed"
+  artifacts:
+    when: always
+    paths:
+      - test-output/
+    expire_in: 1 week
+
+python-only-tests:
+  stage: test
+  image: python:3.12-slim
+  needs: ["check-environment"]
+  script:
+    - pip install numpy pandas --quiet
+    - echo "=== Python-Only Tests (no MATLAB needed) ==="
+    - |
+      echo ":: JSON parsing"
+      echo '[[1,2],[3,4]]' | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      assert len(d)==2, 'bad shape'
+      print('JSON OK')
+      "
+
+      echo ":: numpy verification"
+      python3 -c "
+      import numpy as np
+      a=np.random.randn(100,5)
+      assert a.shape==(100,5), 'bad shape'
+      print(f'numpy OK: {a.shape}')
+      "
+
+      echo ":: pandas csv test"
+      python3 -c "
+      import pandas as pd, io
+      df=pd.read_csv(io.StringIO('a,b,c\n1,2,3\n4,5,6'))
+      assert df.shape==(2,3), 'bad csv'
+      print('pandas OK')
+      "
+
+# ─── 子命令测试 ──────────────────────────────────────────────
+
+subcommand-tests:
+  stage: test
+  tags:
+    - matlab-runner
+  needs: ["unit-tests"]
+  script:
+    - echo "=== Subcommand Tests ==="
+    - |
+      echo ":: optimize"
+      ml optimize --rosenbrock --json 2>&1 | grep -q "fval" || exit 1
+
+      echo ":: solve"
+      ml solve --vanderpol --json 2>&1 | grep -q "n_steps" || exit 1
+
+      echo ":: aero"
+      ml aero --alt 10000 2>&1 | grep -q "T=" || exit 1
+
+      echo ":: mat export"
+      "$MATLAB_BIN" -batch "A=eye(3);save('/tmp/gitlab_ci_test.mat','A');exit" 2>/dev/null
+      ml mat list /tmp/gitlab_ci_test.mat --json 2>&1 | grep -q "A" || exit 1
+
+      echo ":: doc"
+      ml doc fft 2>&1 | grep -q "fft" || exit 1
+
+      echo ":: template"
+      ml template data /tmp/ci_template 2>&1 | grep -q "Created" || exit 1
+
+      echo ":: lint"
+      echo "x=1; y=2;" > /tmp/ci_lint.m
+      ml lint /tmp/ci_lint.m 2>&1 | grep -q "pass" || exit 1
+    - echo "All subcommand tests passed"
+
+# ─── 输出格式测试 ──────────────────────────────────────────────
+
+format-tests:
+  stage: test
+  image: python:3.12-slim
+  tags:
+    - matlab-runner
+  needs: ["unit-tests", "python-only-tests"]
+  script:
+    - pip install numpy --quiet
+    - echo "=== Output Format Tests ==="
+    - |
+      echo ":: JSON→Python"
+      ml eval --json "rand(2)" 2>&1 | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      assert len(d)==2 and len(d[0])==2
+      print('JSON→Python OK')
+      "
+
+      echo ":: TABLE→readable"
+      ml eval --table "eye(2)" 2>&1 | python3 -c "
+      import sys
+      lines=[l for l in sys.stdin if '|' in l]
+      assert len(lines)>=3, 'bad table'
+      print('Table OK')
+      "
+
+      echo ":: CSV→parse"
+      ml eval --csv "[1 2;3 4]" 2>&1 | python3 -c "
+      import sys
+      lines=[l.strip() for l in sys.stdin if l.strip().startswith(('1','2','3','4','5','6','7','8'))]
+      assert len(lines)==2, 'bad csv'
+      print('CSV OK')
+      "
+
+      echo ":: Pipe input"
+      result=$(echo "1 2 3 4 5" | ml eval "sum(ans)" 2>&1 | tail -1 | tr -d ' ')
+      test "$result" = "15" && echo "Pipe OK" || exit 1
+
+# ═══════════════════════════════════════════════════════════════
+# Stage 3: Integration — MATLAB+Python 协同
+# ═══════════════════════════════════════════════════════════════
+
+integration-pattern-1:
+  stage: integration
+  tags:
+    - matlab-runner
+  needs: ["format-tests"]
+  script:
+    - echo "=== Pattern 1: MATLAB FFT → Python Analysis ==="
+    - pip install numpy --quiet
+    - |
+      "$MATLAB_BIN" -batch "fs=1000;t=0:1/fs:1;x=sin(2*pi*50*t);audiowrite('/tmp/ci_integration.wav',x,fs);exit" 2>/dev/null
+      ml signal /tmp/ci_integration.wav --fft --json 2>&1 | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      peak=int(d['peak_freq'])
+      assert abs(peak-50)<2, f'Expected 50Hz, got {peak}'
+      print(f'P1 OK: peak={peak}Hz, dur={d[\"duration\"]:.1f}s')
+      "
+
+integration-pattern-2:
+  stage: integration
+  tags:
+    - matlab-runner
+  needs: ["format-tests"]
+  script:
+    - echo "=== Pattern 2: Python → MATLAB ODE ==="
+    - |
+      result=$(echo "1 0.2 10" | ml eval "a=ans;m=a(1);c=a(2);k=a(3);[t,y]=ode45(@(t,y)[y(2);(-c*y(2)-k*y(1))/m],[0 10],[1;0]);fprintf('steps=%d',length(t))" 2>&1 | grep "steps=")
+      echo "P2: $result"
+
+integration-pattern-3:
+  stage: integration
+  tags:
+    - matlab-runner
+  needs: ["format-tests"]
+  script:
+    - pip install numpy --quiet
+    - echo "=== Pattern 3: MATLAB Optimization → Python Report ==="
+    - |
+      ml optimize --rosenbrock --json 2>&1 | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      assert d['exitflag']==1, 'Optimization failed'
+      err=abs(d['x_opt'][0]-1)+abs(d['x_opt'][1]-1)
+      assert err<0.01, f'Convergence error {err}'
+      print(f'P3 OK: fval={d[\"fval\"]:.2e}, iters={d[\"iterations\"]}')
+      "
+
+integration-pattern-5:
+  stage: integration
+  tags:
+    - matlab-runner
+  needs: ["integration-pattern-1"]
+  script:
+    - pip install numpy --quiet
+    - echo "=== Pattern 5: Big Pipeline (gen→FFT→Python peaks) ==="
+    - |
+      "$MATLAB_BIN" -batch "fs=1000;t=0:1/fs:2-1/fs;x=sin(2*pi*50*t)+0.3*sin(2*pi*150*t);audiowrite('/tmp/ci_pipe.wav',x,fs);exit" 2>/dev/null
+      ml signal /tmp/ci_pipe.wav --fft --json 2>&1 | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      assert abs(d['peak_freq']-50)<2, 'Peak not 50Hz'
+      print(f'P5 OK: peak={d[\"peak_freq\"]:.0f}Hz')
+      "
+
+# ═══════════════════════════════════════════════════════════════
+# Stage 3b: Image & Signal (独立,可并行)
+# ═══════════════════════════════════════════════════════════════
+
+image-processing:
+  stage: integration
+  tags:
+    - matlab-runner
+  needs: ["format-tests"]
+  script:
+    - echo "=== Image Processing Test ==="
+    - |
+      "$MATLAB_BIN" -batch "imwrite(rand(100,100,3),'/tmp/ci_image.png');exit" 2>/dev/null
+      ml image /tmp/ci_image.png --info --json 2>&1 | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      assert d['width']==100 and d['height']==100
+      print(f'Image OK: {d[\"width\"]}x{d[\"height\"]} {d[\"format\"]}')
+      "
+
+signal-processing:
+  stage: integration
+  tags:
+    - matlab-runner
+  needs: ["integration-pattern-1"]
+  script:
+    - pip install numpy --quiet
+    - echo "=== Signal PSD Test ==="
+    - |
+      ml signal /tmp/ci_integration.wav --psd --json 2>&1 | python3 -c "
+      import json,sys
+      d=json.load(sys.stdin)
+      assert d['total_power']>0, 'Zero power'
+      print(f'PSD OK: power={d[\"total_power\"]:.4f}')
+      "
+
+# ═══════════════════════════════════════════════════════════════
+# Stage 4: Report — 汇总结果
+# ═══════════════════════════════════════════════════════════════
+
+generate-report:
+  stage: report
+  image: python:3.12-slim
+  needs:
+    - unit-tests
+    - subcommand-tests
+    - format-tests
+    - integration-pattern-1
+    - integration-pattern-2
+    - integration-pattern-3
+    - integration-pattern-5
+    - image-processing
+    - signal-processing
+  when: always
+  script:
+    - |
+      echo "=========================================="
+      echo "  ml CLI GitLab CI/CD Report"
+      echo "  Pipeline: ${CI_PIPELINE_ID}"
+      echo "  Branch: ${CI_COMMIT_REF_NAME}"
+      echo "  Status: ${CI_JOB_STATUS}"
+      echo "=========================================="
+    - python3 scripts/generate_report.py
+    - echo ""
+    - echo "--- Generated Report ---"
+    - cat report.md
+  artifacts:
+    paths:
+      - report.md
+    expire_in: 1 month
+
+# ═══════════════════════════════════════════════════════════════
+# 可选: Docker 镜像构建和发布
+# ═══════════════════════════════════════════════════════════════
+
+# build-ml-image:
+#   stage: setup
+#   image: docker:24
+#   services:
+#     - docker:24-dind
+#   script:
+#     - docker build -t ml-cli:latest .
+#     - docker tag ml-cli:latest $CI_REGISTRY_IMAGE/ml-cli:$CI_COMMIT_SHORT_SHA
+#     - docker push $CI_REGISTRY_IMAGE/ml-cli:$CI_COMMIT_SHORT_SHA
+#   only:
+#     - main
+#     - tags

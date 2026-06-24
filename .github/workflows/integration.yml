@@ -1,0 +1,144 @@
+name: ML-Python Integration Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'matlab/**'
+      - 'tests/test_ml_python_integration.sh'
+      - '.github/workflows/integration.yml'
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'   # Weekly Monday 6AM UTC
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: MATLAB+Python Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        matlab-version: [R2024a]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python deps
+        run: pip install numpy scipy pandas
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: ${{ matrix.matlab-version }}
+
+      - name: Add ml to PATH
+        run: echo "$(pwd)/bin" >> $GITHUB_PATH
+
+      - name: Verify environment
+        run: |
+          echo "=== MATLAB ==="
+          matlab -batch "fprintf('MATLAB %s\n', version('-release'))" 2>&1 | tail -1
+          echo "=== Python ==="
+          python3 --version
+          python3 -c "import numpy; print(f'numpy {numpy.__version__}')"
+          python3 -c "import scipy; print(f'scipy {scipy.__version__}')"
+          echo "=== ml CLI ==="
+          ml --version
+
+      - name: Run integration tests
+        run: |
+          chmod +x tests/test_ml_python_integration.sh
+          bash tests/test_ml_python_integration.sh 2>&1
+        timeout-minutes: 30
+
+      - name: Quick interop smoke tests
+        if: success() || failure()
+        run: |
+          echo "=== Pattern 1: MATLAB→JSON→Python ==="
+          ml eval --json "rand(2)" 2>&1 | grep -v "Trial" | python3 -c "
+  import json, sys
+  d = json.load(sys.stdin)
+  print(f'OK: {len(d)}x{len(d[0])}')
+  "
+
+          echo "=== Pattern 3: Optimize→Python ==="
+          ml optimize --rosenbrock --json 2>&1 | grep -v "Trial" | python3 -c "
+  import json, sys
+  d = json.load(sys.stdin)
+  assert abs(d['x_opt'][0]-1.0) < 0.01, 'Optimization failed'
+  print(f'OK: fval={d[\"fval\"]:.2e}, iters={d[\"iterations\"]}')
+  "
+
+          echo "=== Format: JSON roundtrip ==="
+          ml eval --json "magic(3)" 2>&1 | grep -v "Trial" | python3 -c "
+  import json, sys
+  d = json.load(sys.stdin)
+  assert len(d) == 3, 'Bad shape'
+  print('OK: JSON roundtrip')
+  "
+
+      - name: Test report
+        if: always()
+        run: |
+          echo "======================================"
+          echo "  ML-Python Integration CI Complete"
+          echo "  MATLAB ${{ matrix.matlab-version }} + Python 3.12"
+          echo "======================================"
+
+  signal-processing:
+    name: Signal & Image Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install numpy
+
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2024a
+
+      - name: Add ml to PATH
+        run: echo "$(pwd)/bin" >> $GITHUB_PATH
+
+      - name: Signal processing test
+        run: |
+          # Generate test signal
+          matlab -batch "fs=1000;t=0:1/fs:2-1/fs;x=sin(2*pi*50*t)+0.3*sin(2*pi*150*t);audiowrite('/tmp/test.wav',x,fs)" 2>&1 | tail -1
+
+          # MATLAB FFT → Python analysis
+          ml signal /tmp/test.wav --fft --json 2>&1 | grep -v "Trial" | python3 -c "
+  import json, sys
+  d = json.load(sys.stdin)
+  assert abs(d['peak_freq'] - 50) < 2, f'Expected 50Hz, got {d[\"peak_freq\"]}'
+  print(f'OK: peak={d[\"peak_freq\"]:.0f}Hz, duration={d[\"duration\"]:.1f}s')
+  "
+
+      - name: Image processing test
+        run: |
+          # Generate test image
+          matlab -batch "imwrite(rand(100,100,3),'/tmp/test.png')" 2>&1 | tail -1
+
+          # Image info
+          ml image /tmp/test.png --info --json 2>&1 | grep -v "Trial" | python3 -c "
+  import json, sys
+  d = json.load(sys.stdin)
+  assert d['width'] == 100, f'Expected 100, got {d[\"width\"]}'
+  assert d['height'] == 100
+  print(f'OK: {d[\"width\"]}x{d[\"height\"]} {d[\"format\"]}')
+  "

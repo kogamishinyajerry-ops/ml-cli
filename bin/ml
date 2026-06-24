@@ -1,0 +1,801 @@
+#!/bin/bash
+# =============================================================================
+# ml — MATLAB CLI Tool  v0.2.0
+# =============================================================================
+# 把 MATLAB 变成 Unix CLI 一等公民。
+# CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
+#
+# 用法: ml <subcommand> [options] [args...]
+#   ml eval  <expr>        求值
+#   ml run   <script.m>    执行
+#   ml plot  <expr>        绘图
+#   ml signal <file>       信号处理
+#   ml image <file>        图像处理
+#   ml info                环境信息
+#   ml bench               性能测试
+#   ml help                帮助
+# =============================================================================
+
+set -euo pipefail
+
+# ─── 常量 ────────────────────────────────────────────────────
+readonly ML_CLI_DIR="${HOME}/ml-cli"
+readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
+readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
+readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
+readonly VERSION="0.3.0"
+
+# ─── 工具函数 ────────────────────────────────────────────────
+die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
+warn() { echo "ml: WARN:  ${*}" >&2; }
+info() { echo "ml: ${*}"; }
+
+version() {
+    echo "ml v${VERSION}"
+    "$MATLAB_BIN" -batch "fprintf('%s\n', version)" 2>&1 \
+        | grep -v "Trial License" | grep -v "^[[:space:]]*$" | head -1
+}
+
+read_stdin() {
+    if [[ ! -t 0 ]]; then
+        cat
+    fi
+}
+
+# ─── MATLAB 执行核心 ─────────────────────────────────────────
+# run_matlab <code> — 执行 MATLAB 代码,输出 stdout,传播 exit code
+run_matlab() {
+    local code="$1"
+    local tmpfile
+    tmpfile="$(mktemp /tmp/ml_cli_XXXXXX.m)"
+
+    # 写入临时文件
+    printf '%s\n' "addpath('${MATLAB_LIB}');" "${code}" > "${tmpfile}"
+
+    set -f  # 禁用 glob expansion
+    "$MATLAB_BIN" -batch "run '${tmpfile}';" 2>&1 \
+        | grep -v "^Trial License" \
+        | grep -v "^[[:space:]]*$" || true
+    local rc="${PIPESTATUS[0]}"
+    set +f
+
+    rm -f "${tmpfile}"
+    return ${rc}
+}
+
+# ─── 共享格式化 ─────────────────────────────────────────────
+# 让子命令统一 --json/--table/--csv 处理
+# 用法: eval "result" format
+format_result() {
+    local expr="$1"
+    local fmt="${2:-text}"
+    case "${fmt}" in
+        json)  echo "try;r=${expr};jsonify(r);catch ME;fprintf(2,'ERR: %s\n',ME.message);end;" ;;
+        table) echo "try;r=${expr};to_table(r);catch ME;fprintf(2,'ERR: %s\n',ME.message);end;" ;;
+        csv)   echo "try;r=${expr};to_csv(r);catch ME;fprintf(2,'ERR: %s\n',ME.message);end;" ;;
+        *)     echo "try;r=${expr};disp(r);catch ME;fprintf(2,'ERR: %s\n',ME.message);end;" ;;
+    esac
+}
+
+# ─── 参数解析助手 ───────────────────────────────────────────
+# 通用 --json/--table/--csv 解析,返回 fmt 变量,$@ 为剩余参数
+parse_format_opts() {
+    local _fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  _fmt="json";  shift ;;
+            --table) _fmt="table"; shift ;;
+            --csv)   _fmt="csv";   shift ;;
+            *)       break ;;
+        esac
+    done
+    echo "${_fmt}""||""$*"
+}
+
+# ─── 子命令: eval ───────────────────────────────────────────
+cmd_eval() {
+    local fmt="text" expr=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            --csv)   fmt="csv";   shift ;;
+            -h|--help) echo "Usage: ml eval [--json|--table|--csv] <expr>"; return 0 ;;
+            *) expr="$*"; break ;;
+        esac
+    done
+
+    # 管道输入:stdin 作为 ans 变量
+    local pipe_input=""
+    if [[ ! -t 0 ]]; then
+        pipe_input="$(cat)"
+    fi
+
+    [[ -z "$expr" ]] && expr="$pipe_input"
+    [[ -z "$expr" ]] && die "eval needs expression"
+
+    # 如果同时有 expr 和 pipe_input,构造 ans=pipe 然后 eval expr
+    local use_direct=0
+    if [[ -n "$pipe_input" && "$expr" != "$pipe_input" ]]; then
+        local pipe_vec
+        pipe_vec=$(echo "$pipe_input" | tr '\n' ' ' | sed 's/[[:space:]]\+/,/g;s/,$//')
+        expr="ans=[${pipe_vec}]; ${expr}"
+        use_direct=1   # 有 = 赋值不能走 eval,直接执行
+    fi
+
+    # 检测多行或含 =:直接当脚本执行
+    if [[ "$expr" == *$'\n'* ]] || [[ $use_direct -eq 1 ]]; then
+        run_matlab "${expr}"
+    else
+        local safe_expr="${expr//\'/\'\\\'\'}"
+        local code="$(format_result "eval('${safe_expr}')" "${fmt}")"
+        run_matlab "${code}"
+    fi
+}
+
+# ─── 子命令: skills ───────────────────────────────────────
+cmd_skills() {
+    local phase="${1:-}"
+    if [[ -z "$phase" ]]; then
+        echo "ml skills <phase>  — list MATLAB scripts by phase"
+        echo ""
+        find "${MATLAB_SKILLS}" -maxdepth 2 -name "*.m" -not -path "*/solutions/*" 2>/dev/null \
+            | sed "s|${MATLAB_SKILLS}/||" | sort | while read f; do
+            echo "  $f"
+        done
+    else
+        find "${MATLAB_SKILLS}" -path "*/${phase}*/*.m" -o -path "*/${phase}*.m" 2>/dev/null \
+            | sed "s|${MATLAB_SKILLS}/||" | sort | while read f; do
+            echo "  $f"
+        done
+        if [[ $(find "${MATLAB_SKILLS}" -path "*/${phase}*/*.m" 2>/dev/null | wc -l) -eq 0 ]]; then
+            # Try searching by number prefix
+            find "${MATLAB_SKILLS}" -name "${phase}*.m" 2>/dev/null \
+                | sed "s|${MATLAB_SKILLS}/||" | sort | while read f; do
+                echo "  $f"
+            done
+        fi
+    fi
+}
+
+# ─── 子命令: run ───────────────────────────────────────────
+cmd_run() {
+    local script="" args="" skills_mode=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --skills) skills_mode=1; shift ;;
+            -h|--help) echo "Usage: ml run [--skills] <script.m>"; return 0 ;;
+            *) script="$1"; shift; args="$*"; break ;;
+        esac
+    done
+    [[ -z "$script" ]] && die "run needs script: ml run script.m"
+
+    if [[ $skills_mode -eq 1 ]]; then
+        # Search matlab-skills repository
+        script=$(find "${MATLAB_SKILLS}" -name "${script}" -o -name "${script}.m" 2>/dev/null | head -1)
+        [[ -z "$script" ]] && die "script not found in ${MATLAB_SKILLS}: $script"
+    fi
+
+    [[ ! -f "$script" ]] && die "file not found: $script"
+
+    local abs_path abs_dir abs_name
+    abs_path="$(cd "$(dirname "$script")" && pwd)/$(basename "$script")"
+    abs_dir="$(dirname "$abs_path")"
+    abs_name="$(basename "$abs_path")"
+
+    run_matlab "cd('${abs_dir}'); run('${abs_name}');"
+}
+
+# ─── 子命令: plot ───────────────────────────────────────────
+cmd_plot() {
+    local expr="" save="" fmt="png"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --save) save="$2"; shift 2 ;;
+            --svg)  fmt="svg"; shift ;;
+            --pdf)  fmt="pdf"; shift ;;
+            -h|--help) echo "Usage: ml plot <plot_cmd> [--save out.png] [--svg|--pdf]"; return 0 ;;
+            *)
+                if [[ -z "$expr" ]]; then
+                    expr="$1"
+                else
+                    expr="$expr $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    [[ -z "$expr" ]] && die "plot needs plot command"
+    local fname="${save:-ml_plot_$(date +%s).${fmt}}"
+
+    run_matlab "figure('Visible','off');${expr};saveas(gcf,'${fname}');close(gcf);fprintf('%s\n','${fname}');"
+}
+
+# ─── 子命令: signal ─────────────────────────────────────────
+cmd_signal() {
+    local file="" op="fft" fmt="text"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            --csv)   fmt="csv";   shift ;;
+            --fft)   op="fft";    shift ;;
+            --psd)   op="psd";    shift ;;
+            --filter) op="filter"; cut_freq="$2"; shift 2 ;;
+            -h|--help)
+                cat <<'HELP'
+ml signal <file> [--fft|--psd|--filter FREQ] [--json|--csv]
+  Analyze audio/signal files.
+  --fft      FFT spectrum
+  --psd      Power Spectral Density (Welch)
+  --filter N Low-pass filter at N Hz
+  Output: spectrum data (JSON/CSV)
+HELP
+                return 0 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+
+    [[ -z "$file" ]] && die "signal needs file: ml signal data.wav"
+    [[ ! -f "$file" ]] && die "file not found: $file"
+
+    case "$op" in
+        fft)
+            run_matlab "$(format_result "signal_fft('${file}')" "${fmt}")" ;;
+        psd)
+            run_matlab "$(format_result "signal_psd('${file}')" "${fmt}")" ;;
+        filter)
+            run_matlab "$(format_result "signal_filter('${file}',${cut_freq:-1000})" "${fmt}")" ;;
+    esac
+}
+
+# ─── 子命令: image ──────────────────────────────────────────
+cmd_image() {
+    local file="" op="info" fmt="text" dim="" out=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)   fmt="json";  shift ;;
+            --table)  fmt="table"; shift ;;
+            --info)   op="info";   shift ;;
+            --resize) op="resize"; dim="$2"; shift 2 ;;
+            --gray)   op="gray";   shift ;;
+            --edge)   op="edge";   shift ;;
+            --hist)   op="hist";   shift ;;
+            --save)   out="$2";    shift 2 ;;
+            -h|--help)
+                cat <<'HELP'
+ml image <file> [--info|--resize WxH|--gray|--edge|--hist] [--save out.png]
+  Image processing CLI.
+  --info       Image metadata (JSON)
+  --resize WxH Resize dimensions
+  --gray       Convert to grayscale
+  --edge       Edge detection (Canny)
+  --hist       Histogram data (JSON)
+  --json       Output as JSON
+  --save FILE  Save result image
+HELP
+                return 0 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+
+    [[ -z "$file" ]] && die "image needs file: ml image photo.png"
+    [[ ! -f "$file" ]] && die "file not found: $file"
+
+    local save_clause=""
+    [[ -n "$out" ]] && save_clause=";imwrite(img,'${out}')"
+
+    case "$op" in
+        info)  run_matlab "$(format_result "image_info('${file}')" "${fmt}")" ;;
+        gray)  run_matlab "img=rgb2gray(imread('${file}'));imshow(img);${save_clause}" ;;
+        edge)  run_matlab "img=edge(rgb2gray(imread('${file}')),'canny');imshow(img);${save_clause}" ;;
+        hist)  run_matlab "$(format_result "image_hist('${file}')" "${fmt}")" ;;
+        resize)
+            w="${dim%x*}"; h="${dim#*x}"
+            run_matlab "img=imresize(imread('${file}'),[${h},${w}]);imshow(img);${save_clause}" ;;
+    esac
+}
+
+# ─── 子命令: control ────────────────────────────────────────
+cmd_control() {
+    local op="step" sys="" fmt="text"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)   fmt="json";  shift ;;
+            --table)  fmt="table"; shift ;;
+            --bode)   op="bode";   shift ;;
+            --nyquist) op="nyquist"; shift ;;
+            -h|--help)
+                echo "ml control <tf_expr> [--bode|--nyquist] [--save out.png]"
+                echo "  ml control 'tf(1,[1 1])'          # step response"
+                echo "  ml control 'tf(10,[1 2 10])' --bode"
+                return 0 ;;
+            *) sys="$*"; break ;;
+        esac
+    done
+
+    [[ -z "$sys" ]] && die "control needs transfer function: ml control 'tf(1,[1 1])'"
+
+    case "$op" in
+        step)
+            run_matlab "sys=${sys};step(sys);grid on;title('Step Response');" ;;
+        bode)
+            run_matlab "sys=${sys};bode(sys);grid on;title('Bode Plot');" ;;
+        nyquist)
+            run_matlab "sys=${sys};nyquist(sys);grid on;title('Nyquist Plot');" ;;
+    esac
+}
+
+# ─── 子命令: aero ──────────────────────────────────────────
+cmd_aero() {
+    local op="isa" alt=0 mach=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --alt)  alt="$2";  op="isa";  shift 2 ;;
+            --mach) mach="$2"; op="mach"; shift 2 ;;
+            --json) fmt="json"; shift ;;
+            -h|--help)
+                echo "ml aero [--alt H] [--mach M]"
+                echo "  ml aero --alt 10000    # ISA at 10km"
+                echo "  ml aero --mach 0.8     # Mach number"
+                return 0 ;;
+            *) shift ;;
+        esac
+    done
+
+    case "$op" in
+        isa)
+            run_matlab "[T,a,P,rho]=atmoscoesa(${alt});fprintf('ISA at %.0fm: T=%.1fK P=%.0fPa rho=%.4f a=%.1fm/s\n',${alt},T,P,rho,a);" ;;
+        mach)
+            run_matlab "T=atmoscoesa(${alt});a=sqrt(1.4*287*T);V=${mach}*a;fprintf('M=%.2f at %.0fm: a=%.1fm/s V=%.1fm/s\n',${mach},${alt},a,V);" ;;
+    esac
+}
+
+# ─── 子命令: optimize ─────────────────────────────────────
+cmd_optimize() {
+    local problem="rosenbrock" fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)       fmt="json";  shift ;;
+            --table)      fmt="table"; shift ;;
+            --rosenbrock) problem="rosenbrock"; shift ;;
+            --himmelblau) problem="himmelblau"; shift ;;
+            --beale)      problem="beale"; shift ;;
+            -h|--help) echo "Usage: ml optimize [--rosenbrock|--himmelblau|--beale] [--json|--table]"; return 0 ;;
+            *) shift ;;
+        esac
+    done
+    run_matlab "$(format_result "cli_optimize('${problem}')" "${fmt}")"
+}
+
+# ─── 子命令: stats ────────────────────────────────────────
+cmd_stats() {
+    local file="" fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            --csv)   fmt="csv";   shift ;;
+            -h|--help) echo "Usage: ml stats <data.csv> [--json|--table|--csv]"; return 0 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+    [[ -z "$file" ]] && die "stats needs file: ml stats data.csv"
+    [[ ! -f "$file" ]] && die "file not found: $file"
+    run_matlab "$(format_result "cli_stats('${file}')" "${fmt}")"
+}
+
+# ─── 子命令: solve ─────────────────────────────────────────
+cmd_solve() {
+    local mode="" fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)       fmt="json";  shift ;;
+            --table)      fmt="table"; shift ;;
+            --vanderpol)  mode="vanderpol"; shift ;;
+            --lorenz)     mode="lorenz"; shift ;;
+            --lotka)      mode="lotka"; shift ;;
+            -h|--help) echo "Usage: ml solve --vanderpol|--lorenz|--lotka [--json]"; return 0 ;;
+            *) shift ;;
+        esac
+    done
+    [[ -z "$mode" ]] && die "solve needs --mode. Try: ml solve --help"
+
+    local code=""
+    case "$mode" in
+        vanderpol) code="cli_ode_solve('vanderpol',[0 20],[2;0],5);" ;;
+        lorenz)    code="cli_ode_solve('lorenz',[0 50],[1;1;1],[10 28 8/3]);" ;;
+        lotka)     code="cli_ode_solve('lotka',[0 30],[10;5],[1.5 1 3 1]);" ;;
+    esac
+    run_matlab "$(format_result "${code}" "${fmt}")"
+}
+
+# ─── 子命令: convert ──────────────────────────────────────
+cmd_convert() {
+    local val="" from="" to=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            -h|--help)
+                echo "Usage: ml convert <value> <from_unit> <to_unit>"
+                echo "  ml convert 1 km m    → 1000"
+                echo "  ml convert 100 C F   → 212"
+                return 0 ;;
+            *)
+                if [[ -z "$val" ]]; then val="$1"
+                elif [[ -z "$from" ]]; then from="$1"
+                elif [[ -z "$to" ]]; then to="$1"
+                fi
+                shift ;;
+        esac
+    done
+    [[ -z "$val" || -z "$from" || -z "$to" ]] && die "convert needs value from to. ml convert 1 km m"
+
+    run_matlab "v=${val};f='${from}';t='${to}';
+base=struct('m',1,'km',1000,'cm',0.01,'mm',0.001,'ft',0.3048,'inch',0.0254,'mile',1609.344,'nm',1852,...
+'kg',1,'g',0.001,'ton',1000,'lb',0.453592,'s',1,'min',60,'h',3600,'day',86400,...
+'deg',pi/180,'rad',1,'m_s',1,'kph',1/3.6,'mph',0.44704,'knot',0.514444,...
+'N',1,'kN',1000,'lbf',4.44822,'Pa',1,'kPa',1000,'atm',101325,'bar',100000,'psi',6894.76);
+if strcmp(f,'C')&&strcmp(t,'F'),r=v*9/5+32;
+elseif strcmp(f,'F')&&strcmp(t,'C'),r=(v-32)*5/9;
+elseif strcmp(f,'C')&&strcmp(t,'K'),r=v+273.15;
+elseif strcmp(f,'K')&&strcmp(t,'C'),r=v-273.15;
+elseif isfield(base,f)&&isfield(base,t),r=v*base.(f)/base.(t);
+else error('unsupported: %s -> %s',f,t);end;
+fprintf('%.6g\n',r);"
+}
+
+# ─── 子命令: doc ─────────────────────────────────────────
+cmd_doc() {
+    local func="$1"
+    [[ -z "$func" ]] && die "doc needs function name. ml doc fft"
+    run_matlab "help ${func};"
+}
+
+# ─── 子命令: new ──────────────────────────────────────────
+cmd_new() {
+    local proj="$1"
+    [[ -z "$proj" ]] && die "new needs project name. ml new my_project"
+
+    # 创建项目目录
+    mkdir -p "${proj}"/{src,tests,data,results,scripts}
+
+    # 创建基本文件
+    cat > "${proj}/README.md" << EOF
+# ${proj}
+
+MATLAB project created by ml CLI.
+
+## Structure
+- \`src/\` — MATLAB source code
+- \`tests/\` — unit tests
+- \`data/\` — data files
+- \`results/\` — generated outputs
+- \`scripts/\` — utility scripts
+EOF
+
+    cat > "${proj}/src/main.m" << EOF
+%% ${proj}/main.m — Main entry point
+%  Created: $(date '+%Y-%m-%d')
+%  Tool:    ml new
+
+function main()
+    fprintf('\\n=== ${proj} ===\\n');
+    fprintf('MATLAB: %s\\n', version('-release'));
+    fprintf('============\\n');
+end
+EOF
+
+    cat > "${proj}/tests/run_tests.m" << EOF
+%% ${proj}/tests/run_tests.m — Test runner
+
+function run_tests()
+    import matlab.unittest.TestSuite
+    import matlab.unittest.TestRunner
+    import matlab.unittest.plugins.TestReportPlugin
+
+    fprintf('\\n=== Running Tests: ${proj} ===\\n');
+
+    suite = TestSuite.fromFolder('.', 'IncludingSubfolders', true);
+    runner = TestRunner.withTextOutput;
+    result = runner.run(suite);
+
+    fprintf('\\nPassed: %d / %d\\n', sum([result.Passed]), numel(result));
+end
+EOF
+
+    cat > "${proj}/scripts/run.sh" << 'RSCRIPT'
+#!/bin/bash
+# Run main project
+export PATH="$HOME/ml-cli/bin:$PATH"
+ml run --skills "main" --json 2>/dev/null || ml run src/main.m
+RSCRIPT
+    chmod +x "${proj}/scripts/run.sh"
+
+    # Create .gitignore
+    cat > "${proj}/.gitignore" << 'GITIGNORE'
+*.asv
+*.m~
+*.mat
+results/*
+data/*.csv
+GITIGNORE
+
+    echo "Created project: ${proj}/"
+    echo "  src/main.m       — main entry point"
+    echo "  tests/run_tests.m — test runner"
+    echo "  scripts/run.sh    — CLI entry"
+    echo ""
+    echo "Run with: ml run ${proj}/src/main.m"
+}
+
+# ─── 子命令: template ────────────────────────────────────
+cmd_template() {
+    local type="${1:-list}" name="${2:-my_script}"
+    local td="${ML_CLI_DIR}/templates"
+
+    if [[ "$type" == "list" ]] || [[ "$type" == "--help" ]] || [[ "$type" == "-h" ]]; then
+        echo "ml template <type> [name]  — generate MATLAB template"
+        echo ""
+        echo "Types:"
+        for d in "$td"/*/; do
+            local t=$(basename "$d")
+            echo "  $t     $(ls "$d"/*.m 2>/dev/null | wc -l | tr -d ' ') template(s)"
+        done
+        echo ""
+        echo "Example: ml template optimization my_solver"
+        return 0
+    fi
+
+    local template="${td}/${type}/$(ls "${td}/${type}"/*.m 2>/dev/null | head -1 | xargs basename)"
+    if [[ ! -f "$template" ]]; then
+        die "Unknown template type: ${type}. Try: ml template list"
+    fi
+
+    local today=$(date '+%Y-%m-%d')
+    local outfile="${name}.m"
+    sed "s/{{NAME}}/${name}/g; s/{{DATE}}/${today}/g; s/{{TYPE}}/${type}/g" "$template" > "$outfile"
+    echo "Created: ${outfile} (type: ${type})"
+}
+
+# ─── 子命令: mat ─────────────────────────────────────────
+cmd_mat() {
+    local action="" file="" fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            -h|--help)
+                echo "Usage: ml mat <action> <file.mat> [args]"
+                echo "  ml mat list  data.mat         list variables"
+                echo "  ml mat info  data.mat --json  detailed info"
+                echo "  ml mat export data.mat --var X --fmt csv --out x.csv"
+                echo "  ml mat merge a.mat b.mat --out merged.mat"
+                echo "  ml mat compare a.mat b.mat"
+                return 0 ;;
+            *)
+                if [[ -z "$action" ]]; then action="$1"
+                elif [[ -z "$file" ]]; then file="$1"
+                fi
+                shift ;;
+        esac
+    done
+    [[ -z "$action" || -z "$file" ]] && die "mat needs action and file. ml mat list file.mat"
+
+    run_matlab "$(format_result "cli_mat('${action}','${file}')" "${fmt}")"
+}
+
+# ─── 子命令: watch ────────────────────────────────────────
+cmd_watch() {
+    local interval=5 cmd=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -n) interval="$2"; shift 2 ;;
+            -h|--help) echo "Usage: ml watch [-n SECONDS] 'expression'"; return 0 ;;
+            *) cmd="$*"; break ;;
+        esac
+    done
+    [[ -z "$cmd" ]] && die "watch needs command. ml watch -n 2 'rand'"
+    while true; do
+        clear 2>/dev/null || true
+        echo "Every ${interval}s: ml eval \"$cmd\""
+        echo "──────────────────────────────"
+        eval "ml eval \"$cmd\"" 2>/dev/null || true
+        sleep "$interval"
+    done
+}
+
+# ─── 子命令: export ────────────────────────────────────────
+cmd_export() {
+    local file="" fmt="csv" out=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --fmt)  fmt="$2"; shift 2 ;;
+            --out)  out="$2";  shift 2 ;;
+            --json) fmt="json"; shift ;;
+            --csv)  fmt="csv";  shift ;;
+            --txt)  fmt="txt";  shift ;;
+            -h|--help) echo "Usage: ml export <file.mat> [--fmt json|csv|txt] [--out file]"; return 0 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+    [[ -z "$file" ]] && die "export needs .mat file"
+    [[ ! -f "$file" ]] && die "file not found: $file"
+    run_matlab "disp(cli_mat('export','${file}','--fmt','${fmt}','--out','${out:-output.${fmt}}'));"
+}
+
+# ─── 子命令: test ──────────────────────────────────────────
+cmd_test() {
+    local dir="."
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) echo "Usage: ml test [dir]  — run MATLAB unit tests in directory"; return 0 ;;
+            *) dir="$1"; shift ;;
+        esac
+    done
+    run_matlab "import matlab.unittest.TestSuite; suite=TestSuite.fromFolder('${dir}','IncludingSubfolders',true); runner=matlab.unittest.TestRunner.withTextOutput; result=runner.run(suite); fprintf('\n%d/%d passed\n',sum([result.Passed]),numel(result));"
+}
+
+# ─── 子命令: repl ─────────────────────────────────────────
+cmd_repl() {
+    # Create startup file to preload CLI lib + set up conveniences
+    local startup="/tmp/ml_repl_startup_$$.m"
+    cat > "$startup" << 'REPL'
+addpath('/Users/Zhuanz/ml-cli/matlab');
+fprintf('\n=== MATLAB CLI REPL ===\n');
+fprintf('ml-cli v0.3 | Preloaded: jsonify, to_table, to_csv\n');
+fprintf('Functions: jsonify(x), to_table(x), to_csv(x), cli_bench, cli_info, cli_lint\n');
+fprintf('Try: jsonify(magic(3))\n');
+fprintf('Type exit/quit to leave.\n');
+fprintf('========================\n\n');
+REPL
+    trap "rm -f '$startup'" EXIT
+    "$MATLAB_BIN" -nodesktop -nosplash -r "run('$startup');"
+}
+
+# ─── 子命令: lint ──────────────────────────────────────────
+cmd_lint() {
+    local file=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) echo "Usage: ml lint <file.m>"; return 0 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+    [[ -z "$file" ]] && die "lint needs file"
+    [[ ! -f "$file" ]] && die "file not found: $file"
+    local abs="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+    run_matlab "cli_lint('${abs}');"
+}
+
+# ─── 子命令: info ──────────────────────────────────────────
+cmd_info() {
+    local fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            -h|--help) echo "Usage: ml info [--json|--table]"; return 0 ;;
+            *) shift ;;
+        esac
+    done
+    run_matlab "cli_info('${fmt}');"
+}
+
+# ─── 子命令: bench ──────────────────────────────────────────
+cmd_bench() {
+    local fmt="text"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)  fmt="json";  shift ;;
+            --table) fmt="table"; shift ;;
+            -h|--help) echo "Usage: ml bench [--json|--table]"; return 0 ;;
+            *) shift ;;
+        esac
+    done
+    run_matlab "cli_bench('${fmt}');"
+}
+
+# ─── 子命令: help ───────────────────────────────────────────
+cmd_help() {
+    if [[ $# -eq 0 ]]; then
+        cat <<'EOF'
+ml — MATLAB CLI Tool  v0.2
+
+COMMANDS:
+  ml eval     <expr>        Evaluate MATLAB expression
+  ml run      <script.m>    Run MATLAB script
+  ml skills   [phase]       List matlab-skills scripts
+  ml plot     <plot_cmd>    Generate plot (--save out.png)
+  ml signal   <file>        Signal analysis (--fft --psd --filter)
+  ml image    <file>        Image processing (--info --gray --edge --resize)
+  ml control  <tf>          Control systems (--bode --nyquist)
+  ml aero     [--alt H]     Aerospace calculations (ISA, Mach)
+  ml stats    <data.csv>    Statistical analysis (--json)
+  ml optimize [--problem]   Optimization (--rosenbrock --himmelblau)
+  ml solve    [--ode]       ODE solver (--vanderpol --lorenz --lotka)
+  ml convert  <v> <from> <to>  Unit conversion
+  ml mat      <action> <f.mat> .mat file ops (list/info/export/merge/compare)
+  ml doc      <function>    Show MATLAB help
+  ml new      <project>     Create project scaffold
+  ml template <type> [name] Generate code template
+  ml watch    [-n SEC] <cmd> Repeat command at interval
+  ml export   <f.mat>       Export .mat to csv/json/txt
+  ml test     [dir]         Run MATLAB unit tests
+  ml repl                   Interactive REPL (terminal)
+  ml info                   MATLAB environment info
+  ml bench                  Performance benchmark
+  ml lint     <file.m>      Code style check
+  ml help     [cmd]         Show help
+
+OPTIONS (on supported commands):
+  --json     JSON output (pipe to jq)
+  --table    Markdown table
+  --csv      CSV output
+  --save F   Save output to file
+
+PIPELINE:
+  echo "1:10" | ml eval "sum(ans)"
+  ml bench --json | jq '.matrix_multiply_1k'
+  ml data file.csv --stats --json | jq '.[0].mean'
+
+EOF
+    else
+        local cmd="$1"
+        case "$cmd" in
+            eval|run|plot|signal|image|control|aero|info|bench|lint|help)
+                "$0" "$cmd" --help 2>/dev/null || echo "ml $cmd — no help available"
+                ;;
+            *) echo "Unknown command: $cmd";;
+        esac
+    fi
+}
+
+# ─── 主入口 ──────────────────────────────────────────────────
+main() {
+    [[ $# -eq 0 ]] && { cmd_help; exit 0; }
+
+    case "$1" in
+        -h|--help)    cmd_help; exit 0 ;;
+        -v|--version) version;  exit 0 ;;
+    esac
+
+    local cmd="$1"; shift
+    case "$cmd" in
+        help)    cmd_help "$@"    ;;
+        eval)    cmd_eval "$@"    ;;
+        run)     cmd_run "$@"     ;;
+        skills)  cmd_skills "$@"  ;;
+        plot)    cmd_plot "$@"    ;;
+        signal)  cmd_signal "$@"  ;;
+        image)   cmd_image "$@"   ;;
+        control) cmd_control "$@" ;;
+        aero)    cmd_aero "$@"    ;;
+        stats)   cmd_stats "$@"   ;;
+        optimize) cmd_optimize "$@" ;;
+        solve)   cmd_solve "$@"   ;;
+        convert) cmd_convert "$@" ;;
+        doc)     cmd_doc "$@"     ;;
+        new)     cmd_new "$@"     ;;
+        template) cmd_template "$@" ;;
+        watch)  cmd_watch "$@"  ;;
+        export) cmd_export "$@" ;;
+        test)   cmd_test "$@"   ;;
+        repl)   cmd_repl "$@"   ;;
+        mat)     cmd_mat "$@"     ;;
+        info)    cmd_info "$@"    ;;
+        bench)   cmd_bench "$@"   ;;
+        lint)    cmd_lint "$@"    ;;
+        fmt)     cmd_fmt "$@"     ;;
+        *)       die "unknown '${cmd}'. Try: ml help" ;;
+    esac
+}
+
+main "$@"
