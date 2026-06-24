@@ -1,5 +1,6 @@
 # ml — MATLAB CLI
 
+[![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
 ![Commands](https://img.shields.io/badge/commands-41-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
