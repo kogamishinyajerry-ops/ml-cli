@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-50-blue)
+![Commands](https://img.shields.io/badge/commands-54-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -56,7 +56,7 @@ ml wavelet families                       # list 13 wavelet families
 ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 ```
 
-## Commands (50)
+## Commands (54)
 
 ### Core
 
@@ -112,6 +112,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml audio <act> <file>` | Audio analysis (pitch/formant/spectrogram) | Audio | ✓ |
 | `ml lidar <act> <cloud>` | Point cloud (segment/cluster/fit) | Lidar | ✓ |
 | `ml ml <act> <data>` | Machine learning (classify/cluster/pca/cv) | Statistics & ML | ✓ |
+| `ml comms <act> --scheme` | Digital comms (QAM/PSK/BER/AWGN) | Communications | ✓ |
+| `ml time <act> <series>` | Time-series (ACF/forecast/ARIMA) | Base MATLAB | ✓ |
+| `ml power <act>` | Power systems (loadflow/fault/line) | Base MATLAB | ✓ |
+| `ml struct <act>` | Structural mechanics (beam/modal/truss) | Base MATLAB | ✓ |
 
 ### Advanced
 
@@ -364,6 +368,49 @@ ml ml dnpredict model.mat new.csv --out preds.csv                   # DNN infere
 ml ml dninfo    model.mat                                           # inspect network
 ```
 
+### `ml comms` — Digital Communications
+
+```bash
+ml comms modulate --scheme qam16 --bits "11001100"               # symbol constellation
+ml comms demod    --scheme bpsk --rx "[1 -0.9 0.8 -1.1]"         # bit recovery
+ml comms ber      --scheme psk8 --snr "0 5 10 15" --nsymb 1000   # BER curve
+ml comms eye      --scheme bpsk --nsamp 100                      # eye diagram data
+ml comms channel  --type awgn --snr 10 --signal "[1 1i -1 -1i]"  # AWGN/Rayleigh
+ml comms spectrum --scheme qpsk --fs 1                           # PSD
+```
+
+### `ml time` — Time-Series Analysis
+
+```bash
+ml time info      data.csv                                        # trend + stationarity
+ml time acf       data.csv --lags 20                             # autocorrelation
+ml time decomp    data.csv --period 12                           # seasonal decomp
+ml time forecast  data.csv --horizon 10 --method hw              # Holt-Winters
+ml time arima     data.csv --p 2 --d 1 --q 1                     # ARIMA fit
+ml time outlier   data.csv --threshold 3                         # robust outlier detect
+```
+
+### `ml power` — Power System Analysis
+
+```bash
+ml power loadflow    --buses 3 --line "[1 2 0 0.1]" --load "[0 0; 1 0.5]" --gen "[0 1.0]"
+ml power fault       --voltage 1.0 --impedance 0.1 --time 0.05   # symmetrical fault
+ml power line        --length 100 --R 0.05 --X 0.3 --V 220 --S "[100 50]"
+ml power transformer --v1 220 --v2 22 --s_rated 100 --z_pct 5    # equivalent circuit
+ml power economic    --cost "[0.01 0.02]" --pmax "[100 80]" --demand 200
+```
+
+### `ml struct` — Structural Mechanics
+
+```bash
+ml struct beam    --length 5 --load 1000 --type simply --E 200e9 --I 1e-4
+ml struct column  --height 3 --E 200e9 --I 1e-4 --A 0.01 --P 50000
+ml struct torsion --length 2 --G 80e9 --J 1e-5 --T 100
+ml struct stress  --Fx 1000 --A 0.01 --My 50 --I 1e-4 --y 0.05
+ml struct modal   --E 200e9 --I 1e-4 --rho 7850 --A 0.01 --length 5 --modes 3
+ml struct truss   --nodes "[0 0; 4 0; 2 3]" --members "[1 2; 1 3; 2 3]" --forces "..." --fixity "..."
+```
+
 ## Pipeline Examples
 
 ```bash
@@ -484,6 +531,14 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.7** (2026-06-24): `comms`, `time`, `power`, `struct` commands.
+  Wave 7 — 4 new engineering modules: digital communications (QAM/PSK/FSK mod,
+  BER sim, AWGN/Rayleigh channel, eye diagram, PSD), time-series (ACF, seasonal
+  decomposition, Holt-Winters/ETS/MA forecast, ARIMA via LS, outlier detection),
+  power systems (DC loadflow, symmetrical fault, π line, transformer equiv,
+  economic dispatch), and structural mechanics (beam deflection, Euler buckling,
+  torsion, combined stress, Euler-Bernoulli modal, 2D truss FEM).
+  **54 commands total.**
 - **v0.3.6** (2026-06-24): `ml ml dnn` deep neural network extension.
   3 new actions — dnn (train classification/regression with customizable
   architecture "h1,h2,..."), dnpredict (inference with confidence scores),

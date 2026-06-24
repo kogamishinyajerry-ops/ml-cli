@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.6
+# ml — MATLAB CLI Tool  v0.3.7
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.6"
+readonly VERSION="0.3.7"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1201,6 +1201,99 @@ EOF
     forward_to "cli_lidar" "$@"
 }
 
+# ─── 子命令: comms ─────────────────────────────────────────
+cmd_comms() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml comms — Digital Communications (QAM/PSK/BER/AWGN/Eye)
+
+Actions:
+  ml comms modulate --scheme qam16 --bits "1010..."     QAM/PSK modulation
+  ml comms demod    --scheme qam16 --rx "[1+i -1-i ...]" demodulation
+  ml comms ber      --scheme psk8 --snr 0:5:15           BER vs SNR sweep
+  ml comms eye      --scheme bpsk --nsamp 100            eye diagram data
+  ml comms channel  --type awgn --snr 10 --signal "[..]" AWGN/Rayleigh channel
+  ml comms spectrum --scheme qpsk --fs 1                 PSD of modulated signal
+
+Schemes: bpsk|qpsk|psk8|psk16|qam16|qam64|qam256|fsk2|fsk4
+Options: --bits --rx --snr --nsymb --nsamp --type awgn|rayleigh --fs
+         --out PATH --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_comms" "$@"
+}
+
+# ─── 子命令: time ──────────────────────────────────────────
+cmd_time() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml time — Time-Series Analysis (ACF/Decompose/Forecast/ARIMA/Outliers)
+
+Actions:
+  ml time info      <series.csv>                          trend, stationarity
+  ml time acf       <series.csv> --lags 20                autocorrelation
+  ml time decomp    <series.csv> --period 12              trend/seasonal/residual
+  ml time forecast  <series.csv> --horizon 10 --method hw Holt-Winters
+  ml time arima     <series.csv> --p 2 --d 1 --q 1        ARIMA fit
+  ml time outlier   <series.csv> --threshold 3            robust outlier detect
+
+Methods: ma|ets|hw (for forecast)
+Options: --lags N --period N --horizon N --p --d --q --threshold --format
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_time" "$@"
+}
+
+# ─── 子命令: power ───────────────────────────���─────────────
+cmd_power() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml power — Power System Analysis (Loadflow/Fault/Line/Transformer/ED)
+
+Actions:
+  ml power loadflow   --buses 3 --line "[1 2 0 0.1]" --load "[0 0; 1 0.5]" --gen "[0 1]"
+  ml power fault      --voltage 1.0 --impedance 0.1 --time 0.05
+  ml power line       --length 100 --R 0.05 --X 0.3 --V 220 --S "[100 50]"
+  ml power transformer --v1 220 --v2 22 --s_rated 100 --z_pct 5
+  ml power economic   --cost "[0.01 0.02]" --pmin "[10 10]" --pmax "[100 80]" --demand 200
+
+Options: --buses N --line MAT --load MAT --gen MAT --length --R --X --V --S
+         --v1 --v2 --s_rated --z_pct --cost --pmin --pmax --demand
+         --voltage --impedance --time --format
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_power" "$@"
+}
+
+# ─── 子命令: struct ────────────────────────────────────────
+cmd_struct() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml struct — Structural Mechanics (Beam/Column/Torsion/Stress/Modal/Truss)
+
+Actions:
+  ml struct beam    --length 5 --load 1000 --type simply --E 200e9 --I 1e-4
+  ml struct column  --height 3 --E 200e9 --I 1e-4 --A 0.01 --P 1000
+  ml struct torsion --length 2 --G 80e9 --J 1e-5 --T 100
+  ml struct stress  --Fx 1000 --A 0.01 --My 50 --I 1e-4 --y 0.05
+  ml struct modal   --E 200e9 --I 1e-4 --rho 7850 --A 0.01 --length 5 --modes 3
+  ml struct truss   --nodes "[0 0; 4 0; 2 3]" --members "[1 2; 1 3; 2 3]" --forces "[0 0; 0 0; 0 -10000]" --fixity "[1 1; 1 1; 0 0]"
+
+Options: --type simply|cantilever|fixed  --length --load --E --I --A --height --P
+         --G --J --T --Fx --My --y --rho --modes --nodes --members --forces --fixity
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_struct" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -1405,6 +1498,10 @@ COMMANDS:
   ml audio  <action> <file>     Audio (info/spectrogram/pitch/formant/noise/synth)
   ml lidar  <action> <cloud>    Point Cloud (info/downsample/segment/cluster/fit/view)
   ml ml     <action> <data>     Machine Learning (classify/regress/cluster/pca/cv)
+  ml comms  <action> --scheme   Communications (modulate/ber/channel/eye/spectrum)
+  ml time   <action> <series>   Time-Series (acf/decomp/forecast/arima/outlier)
+  ml power  <action>            Power Systems (loadflow/fault/line/transformer/ed)
+  ml struct <action>            Structural (beam/column/torsion/modal/truss)
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -1490,6 +1587,10 @@ main() {
         audio)   cmd_audio "$@"   ;;
         lidar)   cmd_lidar "$@"   ;;
         ml)      cmd_ml "$@"      ;;
+        comms)   cmd_comms "$@"   ;;
+        time)    cmd_time "$@"    ;;
+        power)   cmd_power "$@"   ;;
+        struct)  cmd_struct "$@"  ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
