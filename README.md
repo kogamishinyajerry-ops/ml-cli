@@ -1,7 +1,7 @@
 # ml — MATLAB CLI
 
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-36-blue)
+![Commands](https://img.shields.io/badge/commands-41-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
