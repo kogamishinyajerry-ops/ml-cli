@@ -987,6 +987,113 @@ HELP
     forward_to "cli_fuzzy" "$@"
 }
 
+# ─── 子命令: dnn ───────────────────────────────────────────
+cmd_dnn() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml dnn <action> [options]
+Deep learning inference (Deep Learning Toolbox required)
+
+Actions:
+  ml dnn list                          list pretrained networks
+  ml dnn layers --net resnet18         inspect layer dimensions
+  ml dnn predict --net resnet18 --image cat.jpg --top 5
+  ml dnn import --onnx model.onnx --save mynet.mat
+
+Options:
+  --net NAME       resnet18/50, googlenet, squeezenet, vgg16/19, etc.
+  --image PATH     image for prediction
+  --top N          top-N predictions (default 5)
+  --onnx PATH      ONNX model to import
+
+Note: pretrained weights require support package (MATLAB Add-Ons).
+HELP
+            return 0 ;;
+    esac
+    forward_to "cli_dnn" "$@"
+}
+
+# ─── 子命令: sim ───────────────────────────────────────────
+cmd_sim() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml sim <action> --model NAME [options]
+Simulink batch operations (Simulink required)
+
+Actions:
+  ml sim load      --model vdp           load and show model info
+  ml sim params    --model vdp           list parameters
+  ml sim run       --model vdp --tfinal 30   simulate
+  ml sim outs      --model vdp           list output blocks
+  ml sim linearize --model vdp           extract transfer function
+  ml sim sweep     --model vdp --param Mu --values "0.5,1,2"
+  ml sim close     --model vdp           close model
+
+Options:
+  --model NAME     .slx file (no extension) or path
+  --tfinal T   --param NAME  --values "v1,v2"  --in N --out N
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "sim needs action. ml sim load --model <name>"
+    forward_to "cli_sim" "$@"
+}
+
+# ─── 子命令: pde ───────────────────────────────────────────
+cmd_pde() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml pde <action> [options]
+PDE solver (Partial Differential Equation Toolbox required)
+
+Actions:
+  ml pde mesh     --geom "[0 1 0 1]" --nx 20 --ny 20
+  ml pde heat     --geom "[0 1]" --alpha 0.1 --ic "sin(pi*x)" --tfinal 1
+  ml pde wave     --geom "[0 1]" --c 1 --ic "sin(pi*x)" --tfinal 2
+  ml pde poisson  --geom "[0 1 0 1]" --nx 30 --ny 30 --f "1"
+
+Options:
+  --geom "[xrange yrange]"   --nx N --ny N
+  --alpha V (heat)  --c V (wave)  --f "expr" (poisson source)
+  --ic "expr"   --bc dirichlet|neumann
+  --tfinal T  --nt N   --plot out.png
+HELP
+            return 0 ;;
+    esac
+    forward_to "cli_pde" "$@"
+}
+
+# ─── 子命令: codegen ───────────────────────────────────────
+cmd_codegen() {
+    case "${1:-}" in
+        -h|--help)
+            cat <<'HELP'
+ml codegen <action> --file fn.m [options]
+MATLAB Coder integration (MATLAB Coder required)
+
+Actions:
+  ml codegen analyze  --file fn.m --args "1"             check readiness
+  ml codegen generate --file fn.m --args "1" --out build/  generate C
+  ml codegen build    --file fn.m --args "1" --out build/  build MEX
+  ml codegen verify   --file fn.m --args "1" --out build/  verify equivalence
+
+Argument types:
+  "1"          scalar double
+  "1,2.5"      two scalars
+  "matrix(3,3),1"   3x3 matrix + scalar
+  "vector(10)"       length-10 vector
+
+Requires: Xcode Command Line Tools (macOS): xcode-select --install
+HELP
+            return 0 ;;
+    esac
+    [[ $# -lt 2 ]] && die "codegen needs action. ml codegen analyze --file fn.m"
+    forward_to "cli_codegen" "$@"
+}
+
 # ─── 子命令: lint ──────────────────────────────────────────
 cmd_lint() {
     local file=""
@@ -1071,6 +1178,10 @@ COMMANDS:
   ml animate <action> --expr  Animation/GIF/MP4 generation
   ml wavelet <action> --signal  Wavelet analysis (dwt/denoise/cwt)
   ml fuzzy   <action> --name    Fuzzy inference (Mamdani/rules/eval)
+  ml dnn     <action>           Deep learning inference
+  ml sim     <action> --model   Simulink batch operations
+  ml pde     <action> --geom    PDE solver (heat/wave/poisson)
+  ml codegen <action> --file    MATLAB Coder (C/MEX generation)
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -1143,6 +1254,10 @@ main() {
         animate) cmd_animate "$@" ;;
         wavelet) cmd_wavelet "$@" ;;
         fuzzy)   cmd_fuzzy "$@"   ;;
+        dnn)     cmd_dnn "$@"     ;;
+        sim)     cmd_sim "$@"     ;;
+        pde)     cmd_pde "$@"     ;;
+        codegen) cmd_codegen "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
