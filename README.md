@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-41-blue)
+![Commands](https://img.shields.io/badge/commands-45-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -56,7 +56,7 @@ ml wavelet families                       # list 13 wavelet families
 ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 ```
 
-## Commands (36)
+## Commands (45)
 
 ### Core
 
@@ -103,6 +103,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml image file` | Image processing (--gray/--edge/...) | Image Processing | ✓ |
 | `ml control "tf"` | Control (legacy) | Control System | — |
 | `ml aero --alt H` | Aerospace (ISA/Mach) | Aerospace | — |
+| `ml pde <act> --geom` | PDE solver (heat/wave/poisson) | Base MATLAB | ✓ |
+| `ml sysid <act> --y` | System identification (arx/ss/tfest) | System ID | ✓ |
+| `ml sensor <act> --meas` | Sensor fusion (EKF/UKF/IMU/radar) | Sensor Fusion | ✓ |
+| `ml antenna <act> --type` | Antenna design (dipole/patch/array) | Antenna | ✓ |
 
 ### Advanced
 
@@ -113,6 +117,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml animate <act> --expr` | GIF/MP4 animation (3 modes) | Base MATLAB | ✓ |
 | `ml wavelet <act> --signal` | Wavelet analysis (5 actions) | Wavelet | ✓ |
 | `ml fuzzy <act> --name` | Fuzzy inference (7 actions) | Fuzzy Logic | ✓ |
+| `ml dnn <act>` | Deep learning inference (14 nets) | Deep Learning | ✓ |
+| `ml sim <act> --model` | Simulink batch (run/linearize) | Simulink | ✓ |
+| `ml codegen <act> --file` | MATLAB Coder (C/MEX) | MATLAB Coder | ✓ |
+| `ml cv <act> <img>` | Computer vision (features/match/track) | Computer Vision | ✓ |
 
 ## Command Details
 
@@ -249,6 +257,47 @@ ml sym latex     "exp(-x^2)"
 ml sym matrix    "det [[a,b];[c,d]]"  # → a*d-b*c
 ```
 
+### `ml cv` — Computer Vision
+
+```bash
+ml cv features coins.png --det surf --max 100     # SURF keypoints (count + top-N)
+ml cv features img.png --det orb                  # ORB keypoints
+ml cv match  a.png b.png                          # feature match + homography
+ml cv track  frame1.png frame2.png                # KLT point tracker
+ml cv stereo left.png right.png                   # stereo disparity map
+ml cv detect img.png                              # YOLOv4 (or ACF fallback)
+```
+
+### `ml sensor` — Sensor Fusion & Tracking
+
+```bash
+ml sensor ekf   --meas track.json --dt 1.0        # Extended Kalman Filter
+ml sensor ukf   --meas track.json                 # Unscented Kalman Filter
+ml sensor imu   --accel 9.8 --gyro 0.1            # IMU attitude fusion
+ml sensor track --meas multi.json                 # multi-object tracker (GNN)
+ml sensor rac   --freq 10e9 --rcs 1 --range 1000  # radar equation SNR
+```
+
+### `ml sysid` — System Identification
+
+```bash
+ml sysid arx     --y y.csv --u u.csv --ts 0.1 --order 2   # ARX polynomial fit
+ml sysid ss      --y y.csv --u u.csv --ts 0.1 --order 4   # state-space model
+ml sysid tfest   --y y.csv --u u.csv --ts 0.1 --np 2      # transfer function est
+ml sysid compare --model m.mat --y y.csv --u u.csv        # fit % + MSE
+```
+
+### `ml antenna` — Antenna Design & RF Analysis
+
+```bash
+ml antenna dipole  --length 0.15 --freq 1                            # Z, D, HPBW
+ml antenna patch   --length 0.045 --width 0.06 --substrate FR4 --freq 2.4
+ml antenna array   --type dipole --elements 4 --spacing 0.5 --freq 1  # linear array
+ml antenna pattern --type dipole --freq 1 --phi 0 --out polar.png     # radiation pattern
+ml antenna sparam  --type dipole --fmin 0.5 --fmax 2 --npts 50        # S11 sweep
+ml antenna mesh    --type dipole --freq 1                             # mesh stats
+```
+
 ## Pipeline Examples
 
 ```bash
@@ -369,6 +418,10 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.3** (2026-06-24): `cv`, `sensor`, `sysid`, `antenna` commands.
+  4 new engineering modules — computer vision (SURF/ORB/KLT/stereo/YOLO),
+  sensor fusion (EKF/UKF/IMU/radar), system identification (ARX/SS/TF), and
+  antenna design (dipole/patch/array/pattern/S-params). **45 commands total.**
 - **v0.3.2** (2026-06-24): `wavelet` and `fuzzy` commands. 6 new engineering
   modules, full tipper FIS example verified.
 - **v0.3.1** (2026-06-24): `lti`, `graph`, `fit`, `animate` commands.

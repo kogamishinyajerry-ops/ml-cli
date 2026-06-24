@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.2.0
+# ml — MATLAB CLI Tool  v0.3.3
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.0"
+readonly VERSION="0.3.3"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1109,6 +1109,95 @@ cmd_lint() {
     run_matlab "cli_lint('${abs}');"
 }
 
+# ─── 子命令: cv ─────────────────────────────────────────────
+cmd_cv() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml cv — Computer Vision (SURF/ORB/KLT/stereo/YOLO)
+
+Actions:
+  ml cv features <img>           keypoints (--det surf|orb|brisk|harris|fast|kaze|mineigen)
+  ml cv match   <a> <b>          feature matching + homography
+  ml cv track   <a> <b>          KLT point tracking
+  ml cv stereo  <L> <R>          stereo disparity
+  ml cv detect  <img>            object detection (YOLOv4/ACF fallback)
+
+Options: --det NAME  --max N  --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_cv" "$@"
+}
+
+# ─── 子命令: sensor ─────────────────────────────────────────
+cmd_sensor() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml sensor — Sensor Fusion & Tracking (EKF/UKF/IMU/radar)
+
+Actions:
+  ml sensor ekf   --meas <m.json>    Extended Kalman Filter tracking
+  ml sensor ukf   --meas <m.json>    Unscented Kalman Filter
+  ml sensor imu   --accel --gyro     IMU fusion
+  ml sensor track --meas <m.json>    Multi-object tracker (GNN)
+  ml sensor rac   --freq --rcs       Radar equation (SNR)
+
+Options: --dt S  --q Q  --r R  --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_sensor" "$@"
+}
+
+# ─── 子命令: sysid ──────────────────────────────────────────
+cmd_sysid() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml sysid — System Identification (ARX/ARMA/State-Space/TF)
+
+Actions:
+  ml sysid arx      --y <y.csv> --u <u.csv> --ts 0.1 --order 2
+  ml sysid arma     --y <y.csv> --ts 0.1 --order 2
+  ml sysid ss       --y <y.csv> --u <u.csv> --ts 0.1 --order 4
+  ml sysid tfest    --y <y.csv> --u <u.csv> --ts 0.1 --np 2
+  ml sysid compare  --model <m.mat> --y <y.csv> --u <u.csv>
+  ml sysid validate --model <m.mat> --y <y.csv> --u <u.csv>
+
+Options: --order N  --ts S  --np P  --nz Z  --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_sysid" "$@"
+}
+
+# ─── 子命令: antenna ────────────────────────────────────────
+cmd_antenna() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml antenna — Antenna Design & RF Analysis (Antenna Toolbox)
+
+Actions:
+  ml antenna dipole  --length 0.15 --freq 1            impedance, directivity
+  ml antenna patch   --length 0.045 --width 0.06 --substrate FR4 --freq 2.4
+  ml antenna array   --type dipole --elements 4 --spacing 0.5 --freq 1
+  ml antenna pattern --type dipole --freq 1 --phi 0 [--out polar.png]
+  ml antenna sparam  --type dipole --fmin 0.5 --fmax 2 --npts 50
+  ml antenna mesh    --type dipole --freq 1
+
+Options: --type dipole|patch  --length m  --width m  --substrate NAME
+         --thickness m  --elements N  --spacing LAMBDA  --freq GHz
+         --phi deg  --fmin GHz  --fmax GHz  --npts N  --out PATH
+         --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_antenna" "$@"
+}
+
 # ─── 子命令: info ──────────────────────────────────────────
 cmd_info() {
     local fmt="text"
@@ -1182,6 +1271,10 @@ COMMANDS:
   ml sim     <action> --model   Simulink batch operations
   ml pde     <action> --geom    PDE solver (heat/wave/poisson)
   ml codegen <action> --file    MATLAB Coder (C/MEX generation)
+  ml cv     <action> <img>      Computer Vision (features/match/track/stereo/detect)
+  ml sensor <action> --meas     Sensor Fusion (ekf/ukf/imu/track/rac)
+  ml sysid  <action> --y        System Identification (arx/arma/ss/tfest/compare)
+  ml antenna <action> --type    Antenna Design (dipole/patch/array/pattern/sparam/mesh)
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -1258,6 +1351,10 @@ main() {
         sim)     cmd_sim "$@"     ;;
         pde)     cmd_pde "$@"     ;;
         codegen) cmd_codegen "$@" ;;
+        cv)      cmd_cv "$@"      ;;
+        sensor)  cmd_sensor "$@"  ;;
+        sysid)   cmd_sysid "$@"   ;;
+        antenna) cmd_antenna "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
