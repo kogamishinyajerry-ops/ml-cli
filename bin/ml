@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.3
+# ml — MATLAB CLI Tool  v0.3.4
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.3"
+readonly VERSION="0.3.4"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1109,6 +1109,98 @@ cmd_lint() {
     run_matlab "cli_lint('${abs}');"
 }
 
+# ─── 子命令: robot ─────────────────────────────────────────
+cmd_robot() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml robot — Robotics (DH / FK / Jacobian / IK / Trajectory / Rotations)
+
+Actions:
+  ml robot dh       --dh "[a alpha d theta; ...]"           build rigid body tree
+  ml robot fk       --dh "..." --q "[q1 q2 q3]"             forward kinematics
+  ml robot jacobian --dh "..." --q "..."                    geometric Jacobian
+  ml robot ik       --dh "..." --target "[x y z r p y]"     inverse kinematics
+  ml robot traj     --q0 "..." --q1 "..." --method trapz    trajectory gen
+  ml robot rpy      --rpy "[10 20 30]"                      rotation conversions
+
+Options: --steps N  --method trapz|quintic  --rotm MAT  --quat VEC
+         --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_robot" "$@"
+}
+
+# ─── 子命令: vehicle ───────────────────────────────────────
+cmd_vehicle() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml vehicle — Vehicle Dynamics (Bicycle model / Pacejka / Maneuvers)
+
+Actions:
+  ml vehicle info       --mass 1500 --a 1.2 --b 1.5     vehicle params + stability
+  ml vehicle pacejka    --slip 5 --B 10 --C 1.65        Magic Formula tire
+  ml vehicle steer      --v 20 --delta 0.05 --tfinal 4  step steer response
+  ml vehicle lanechange --v 20 --tfinal 8               sine-with-dwell maneuver
+  ml vehicle straight   --v 30                           open-loop stability
+  ml vehicle road       --radius 50 --v 15              road curvature steer
+
+Options: --Caf N --Car N --Iz VAL --slip deg --D --B --C --E
+         --format json|table|csv
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_vehicle" "$@"
+}
+
+# ─── 子命令: audio ─────────────────────────────────────────
+cmd_audio() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml audio — Audio Analysis (Info / Spectrogram / Pitch / Formants / Synth)
+
+Actions:
+  ml audio info        <file.wav>                       file info
+  ml audio spectrogram <file.wav> --nfft 1024           STFT spectrogram
+  ml audio pitch       <file.wav> --fmin 80 --fmax 400  F0 tracking
+  ml audio formant     <file.wav> --numformants 3       vowel formants (LPC)
+  ml audio noise       <file.wav> --method wiener       noise reduction
+  ml audio synth       --freq 440 --dur 1 --type sine   tone generation
+
+Options: --fmin --fmax --method wiener|spectral --type sine|chirp|square|saw
+         --out PATH --fs Hz --nfft N --order N
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_audio" "$@"
+}
+
+# ─── 子命令: lidar ─────────────────────────────────────────
+cmd_lidar() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml lidar — Point Cloud Processing (Lidar Toolbox)
+
+Actions:
+  ml lidar info       <cloud.pcd>                      point cloud stats
+  ml lidar downsample <cloud.pcd> --grid 0.1           voxel grid downsample
+  ml lidar segment    <cloud.pcd> --threshold 0.3      ground segmentation
+  ml lidar cluster    <cloud.pcd> --dist 0.5           euclidean clustering
+  ml lidar fit        <cloud.pcd> --shape plane        RANSAC plane/sphere/cylinder
+  ml lidar view       <cloud.pcd> [--out plot.png]     visualize
+
+Options: --grid m --threshold m --dist m --minpoints N
+         --shape plane|sphere|cylinder --maxdist m --maxtrials N --out PATH
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_lidar" "$@"
+}
+
 # ─── 子命令: cv ─────────────────────────────────────────────
 cmd_cv() {
     case "$1" in
@@ -1275,6 +1367,10 @@ COMMANDS:
   ml sensor <action> --meas     Sensor Fusion (ekf/ukf/imu/track/rac)
   ml sysid  <action> --y        System Identification (arx/arma/ss/tfest/compare)
   ml antenna <action> --type    Antenna Design (dipole/patch/array/pattern/sparam/mesh)
+  ml robot  <action> --dh       Robotics (dh/fk/jacobian/ik/traj/rpy)
+  ml vehicle <action>           Vehicle Dynamics (pacejka/steer/lanechange/straight/road)
+  ml audio  <action> <file>     Audio (info/spectrogram/pitch/formant/noise/synth)
+  ml lidar  <action> <cloud>    Point Cloud (info/downsample/segment/cluster/fit/view)
   ml help     [cmd]         Show help
 
 OPTIONS (on supported commands):
@@ -1355,6 +1451,10 @@ main() {
         sensor)  cmd_sensor "$@"  ;;
         sysid)   cmd_sysid "$@"   ;;
         antenna) cmd_antenna "$@" ;;
+        robot)   cmd_robot "$@"   ;;
+        vehicle) cmd_vehicle "$@" ;;
+        audio)   cmd_audio "$@"   ;;
+        lidar)   cmd_lidar "$@"   ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }

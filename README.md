@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-45-blue)
+![Commands](https://img.shields.io/badge/commands-49-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -56,7 +56,7 @@ ml wavelet families                       # list 13 wavelet families
 ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 ```
 
-## Commands (45)
+## Commands (49)
 
 ### Core
 
@@ -107,6 +107,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml sysid <act> --y` | System identification (arx/ss/tfest) | System ID | ✓ |
 | `ml sensor <act> --meas` | Sensor fusion (EKF/UKF/IMU/radar) | Sensor Fusion | ✓ |
 | `ml antenna <act> --type` | Antenna design (dipole/patch/array) | Antenna | ✓ |
+| `ml robot <act> --dh` | Robotics (DH/FK/IK/Jacobian/traj) | Robotics System | ✓ |
+| `ml vehicle <act>` | Vehicle dynamics (bicycle/Pacejka) | Base MATLAB | ✓ |
+| `ml audio <act> <file>` | Audio analysis (pitch/formant/spectrogram) | Audio | ✓ |
+| `ml lidar <act> <cloud>` | Point cloud (segment/cluster/fit) | Lidar | ✓ |
 
 ### Advanced
 
@@ -298,6 +302,50 @@ ml antenna sparam  --type dipole --fmin 0.5 --fmax 2 --npts 50        # S11 swee
 ml antenna mesh    --type dipole --freq 1                             # mesh stats
 ```
 
+### `ml robot` — Robotics
+
+```bash
+ml robot dh       --dh "[1 0 0 0; 1 0 0 pi/2; 0.5 0 0 0]"              # build tree
+ml robot fk       --dh "..." --q "[0.3 0.5 0.2]"                       # forward kinematics
+ml robot jacobian --dh "..." --q "..."                                 # geometric Jacobian
+ml robot ik       --dh "..." --target "[1.5 1 0 0 0 90]"               # inverse kinematics
+ml robot traj     --q0 "[0 0 0]" --q1 "[pi/2 pi/3 pi/4]" --method quintic
+ml robot rpy      --rpy "[10 20 30]"                                   # rotation → rotm/quat
+```
+
+### `ml vehicle` — Vehicle Dynamics
+
+```bash
+ml vehicle info       --mass 1500 --a 1.2 --b 1.5                      # understeer, Vcr
+ml vehicle pacejka    --slip 5 --B 10 --C 1.65 --D 1                   # Magic Formula
+ml vehicle steer      --v 20 --delta 0.05 --tfinal 4                   # step steer
+ml vehicle lanechange --v 20 --tfinal 8                                # sine-with-dwell
+ml vehicle straight   --v 30                                           # eigenvalues
+ml vehicle road       --radius 50 --v 15                               # curvature → δ
+```
+
+### `ml audio` — Audio Analysis
+
+```bash
+ml audio info        speech.wav                                       # file metadata
+ml audio spectrogram speech.wav --nfft 1024                           # STFT
+ml audio pitch       voice.wav --fmin 80 --fmax 400                   # F0 tracking
+ml audio formant     vowel.wav --numformants 3                        # F1/F2/F3 (LPC)
+ml audio noise       noisy.wav --method wiener --out clean.wav        # denoise
+ml audio synth       --freq 440 --dur 1 --type sine --out tone.wav    # tone synth
+```
+
+### `ml lidar` — Point Cloud Processing
+
+```bash
+ml lidar info       scan.pcd                                         # point count, bbox
+ml lidar downsample scan.pcd --grid 0.1                              # voxel downsample
+ml lidar segment    scan.pcd --threshold 0.3                         # ground segmentation
+ml lidar cluster    scan.pcd --dist 0.5 --minpoints 10               # euclidean clusters
+ml lidar fit        scan.pcd --shape plane --maxdist 0.05            # RANSAC plane fit
+ml lidar view       scan.pcd --out plot.png                          # visualize
+```
+
 ## Pipeline Examples
 
 ```bash
@@ -418,6 +466,12 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.4** (2026-06-24): `robot`, `vehicle`, `audio`, `lidar` commands.
+  4 new engineering modules — robotics (DH kinematics, IK, Jacobian, trajectory),
+  vehicle dynamics (bicycle model, Pacejka tire, step/lane-change maneuvers),
+  audio (spectrogram, pitch, formants, Wiener denoise, synthesis), and lidar
+  point cloud (downsample, ground segmentation, clustering, RANSAC fitting).
+  **49 commands total.**
 - **v0.3.3** (2026-06-24): `cv`, `sensor`, `sysid`, `antenna` commands.
   4 new engineering modules — computer vision (SURF/ORB/KLT/stereo/YOLO),
   sensor fusion (EKF/UKF/IMU/radar), system identification (ARX/SS/TF), and
