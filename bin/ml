@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.14
+# ml — MATLAB CLI Tool  v0.3.15
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.14"
+readonly VERSION="0.3.15"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1828,6 +1828,93 @@ EOF
     forward_to "cli_seismic" "$@"
 }
 
+# ─── 子命令: ml welding ──────────────────────────────────────
+cmd_welding() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml welding — Welding Engineering (HeatInput/Cooling/CEq/Preheat/Distortion/Strength)
+
+Actions:
+  ml welding heat_input --current 200 --voltage 25 --speed 5 --efficiency 0.8
+  ml welding ceq        --C 0.15 --Mn 1.2 --Cr 0.5 --Mo 0.2
+  ml welding preheat    --Ceq 0.45 --thickness 25 --hydrogen low
+  ml welding cooling    --heatInput 800 --thickness 10 --temp 200 --preheat 150
+  ml welding distortion --length 500 --width 10 --heatInput 1000
+
+IIW Carbon Equivalent, EN 1011-2 preheat, Rosenthal cooling rate, t8/5, angular distortion.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_welding" "$@"
+}
+
+# ─── 子命令: ml hydrology ────────────────────────────────────
+cmd_hydrology() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml hydrology — Water Resources (Rational/SCS/Hydrograph/Manning/Infiltration/Weir)
+
+Actions:
+  ml hydrology rational    --C 0.6 --I 50 --A 10
+  ml hydrology scs         --CN 80 --P 100 --AMC II
+  ml hydrology hydrograph  --A 100 --tc 2 --P 50
+  ml hydrology manning     --n 0.015 --R 1.2 --S 0.001
+  ml hydrology infiltration --K 10 --F0 20 --Fc 5 --t 60
+  ml hydrology weir        --H 0.5 --L 3 --Cd 0.62
+
+SCS Curve Number, unit hydrograph, Horton infiltration, Manning's equation, sharp-crested weir.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_hydrology" "$@"
+}
+
+# ─── 子命令: ml pavement ─────────────────────────────────────
+cmd_pavement() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml pavement — Pavement Design (AASHTO/ESAL/Fatigue/Rutting/Layer/Cost)
+
+Actions:
+  ml pavement aashto  --W18 5 --R 85 --S0 0.45 --Mr 5000 --dpsi 1.5
+  ml pavement esal    --axleLoad 80 --n 1000
+  ml pavement fatigue --strain 200e-6 --E 3000 --nCycles 1e6
+  ml pavement rutting --strain 400e-6 --E 3000 --nCycles 1e6
+  ml pavement layer   --SN 5 --a1 0.44 --a2 0.14 --a3 0.08
+  ml pavement cost    --area 10000 --thickness "[0.15,0.2,0.1]" --unitCost "[50,40,30]"
+
+AASHTO 1993 Newton-Raphson SN solver, 4th-power ESAL law, Asphalt Institute fatigue/rutting.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_pavement" "$@"
+}
+
+# ─── 子命令: ml fire ─────────────────────────────────────────
+cmd_fire() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml fire — Fire Safety Engineering (HeatRelease/Smoke/Egress/Flashover/Sprinkler/FRR)
+
+Actions:
+  ml fire heat_release --area 100 --hrrpua 500 --growth fast
+  ml fire smoke        --HRR 2000 --fuel wood
+  ml fire egress       --density 0.5 --width 1.2 --nPeople 200
+  ml fire flashover    --area 25 --venting 2 --compartment 2.5
+  ml fire sprinkler    --RTI 100 --temp 68 --distance 3
+  ml fire frr          --structure steel --failureTemp 550 --HRR 5000
+
+t-squared fire growth, Thomas flashover criterion, SFPE egress, DETACT-QS sprinkler activation.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_fire" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -2150,6 +2237,10 @@ main() {
         concrete) cmd_concrete "$@" ;;
         corrosion) cmd_corrosion "$@" ;;
         seismic) cmd_seismic "$@" ;;
+        welding) cmd_welding "$@" ;;
+        hydrology) cmd_hydrology "$@" ;;
+        pavement) cmd_pavement "$@" ;;
+        fire)    cmd_fire "$@"    ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
