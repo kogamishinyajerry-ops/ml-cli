@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.16
+# ml — MATLAB CLI Tool  v0.3.17
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.16"
+readonly VERSION="0.3.17"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1960,6 +1960,94 @@ EOF
     forward_to "cli_ventilation" "$@"
 }
 
+# ─── 子命令: ml lighting ─────────────────────────────────────
+cmd_lighting() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml lighting — Lighting Design (Lumen/Point/Daylight/Glare/Layout/Energy)
+
+Actions:
+  ml lighting lumen    --area 100 --lux 500 --LLF 0.8 --lor 0.7
+  ml lighting point    --I 1000 --h 3 --d 2
+  ml lighting daylight --window 5 --room 50 --trans 0.7 --ext 10000
+  ml lighting glare    --L_s 5000 --L_b 200 --omega 0.01 --p 2
+  ml lighting layout   --area 100 --fixtures 12 --rows 3
+  ml lighting energy   --power 36 --hours 3000 --n 12
+
+CIBSE lumen method, point-by-point illuminance, daylight factor, UGR glare rating.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_lighting" "$@"
+}
+
+# ─── 子命令: ml marine ───────────────────────────────────────
+cmd_marine() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml marine — Naval Architecture (Buoyancy/Stability/Resistance/Propeller/Trim/Heeling)
+
+Actions:
+  ml marine buoyancy   --L 50 --B 10 --T 3 --Cb 0.7
+  ml marine stability  --KB 1.5 --KG 4 --BM 2.5
+  ml marine resistance --L 100 --B 15 --T 5 --v 7
+  ml marine propeller  --D 3 --n 2 --v_a 5
+  ml marine trim       --L 80 --LCG 35 --LCB 38 --displacement 5000
+  ml marine heeling    --GM 0.8 --displacement 3000 --heelingMoment 5000
+
+ITTC-57 friction, Holtrop-Mennen residuary, Wageningen B-series propeller, metacentric height.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_marine" "$@"
+}
+
+# ─── 子命令: ml nuclear ──────────────────────────────────────
+cmd_nuclear() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml nuclear — Nuclear/Radiological Engineering (Decay/Chain/Shielding/Activity/Criticality/Dose)
+
+Actions:
+  ml nuclear decay       --N0 1e6 --T_half 10 --t 30
+  ml nuclear chain       --T1 10 --T2 50 --t 20
+  ml nuclear shielding   --thickness 0.05 --rho 11350 --material lead
+  ml nuclear activity    --mass 0.001 --T_half 432 --isotope Co60
+  ml nuclear criticality --mass 50 --rho 19.1 --enrichment 5 --shape sphere
+  ml nuclear dose        --activity 1e9 --distance 1 --isotope Cs137 --time 1
+
+Bateman equation, gamma attenuation (HVL/TVL), Gamma dose rate constants for 7 isotopes.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_nuclear" "$@"
+}
+
+# ─── 子命令: ml traffic ──────────────────────────────────────
+cmd_traffic() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml traffic — Traffic Engineering (Flow/Signal/LOS/Greenshields/Capacity/Queue)
+
+Actions:
+  ml traffic flow         --q 1500 --v 80
+  ml traffic signal       --cycle 90 --flows "[400,300,200]" --sat 1800
+  ml traffic los          --v 80 --vFree 100 --type freeway
+  ml traffic greenshields --vFree 100 --kJam 120 --k 30
+  ml traffic capacity     --lanes 3 --type freeway
+  ml traffic queue        --arrival 800 --departure 1000 --t 15
+
+Fundamental diagram q=k*v, Webster optimum cycle, HCM LOS thresholds, Greenshields model.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_traffic" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -2288,6 +2376,10 @@ main() {
         fire)    cmd_fire "$@"    ;;
         vibration) cmd_vibration "$@" ;;
         ventilation) cmd_ventilation "$@" ;;
+        lighting) cmd_lighting "$@" ;;
+        marine)  cmd_marine "$@"  ;;
+        nuclear) cmd_nuclear "$@" ;;
+        traffic) cmd_traffic "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
