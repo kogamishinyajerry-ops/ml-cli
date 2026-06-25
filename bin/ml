@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.11
+# ml — MATLAB CLI Tool  v0.3.12
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.11"
+readonly VERSION="0.3.12"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1608,6 +1608,93 @@ EOF
     forward_to "cli_fluid" "$@"
 }
 
+# ─── 子命令: ml optics ───────────────────────────────────────
+cmd_optics() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml optics — Optics (Lens/Refraction/Diffraction/NA/Grating/Polarization)
+
+Actions:
+  ml optics lens         --f 50 --u 200 --solve v|u|f|m
+  ml optics refraction   --n1 1.0 --n2 1.5 --theta1 30
+  ml optics diffraction  --lambda 500e-9 --slit 0.1e-3 --distance 1
+  ml optics na           --diameter 2e-3 --focal 10e-3
+  ml optics grating      --lines 600 --order 1 --lambda 500e-9
+  ml optics polarization --mode brewster|malus --n1 1.0 --n2 1.5
+
+Thin lens equation, Snell's law with TIR detection, single-slit diffraction, f-number/Airy disk.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_optics" "$@"
+}
+
+# ─── 子命令: ml reliability ──────────────────────────────────
+cmd_reliability() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml reliability — Reliability Engineering (Weibull/Bathtub/MTBF/Parallel/Series)
+
+Actions:
+  ml reliability weibull  --shape 2 --scale 1000 --time 500
+  ml reliability bathtub  --infant 1.2 --useful 0.8 --wear 3.0 --time 400
+  ml reliability mtbf     --failures 3 --operatingHours 10000
+  ml reliability parallel --lambda 0.001 --n 3
+  ml reliability series   --lambdas "[0.001,0.002,0.0005]"
+
+2-parameter Weibull with B10 life, bathtub curve, MTBF with χ² 90% CI, reliability block diagrams.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_reliability" "$@"
+}
+
+# ─── 子命令: ml weather ──────────────────────────────────────
+cmd_weather() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml weather — Weather/Meteorology (DewPoint/WindChill/HeatIndex/Humidity/Pressure/WindPower)
+
+Actions:
+  ml weather dew_point  --temp 25 --rh 60
+  ml weather wind_chill --temp -5 --wind 30
+  ml weather heat_index --temp 33 --rh 70
+  ml weather humidity   --temp 20 --dew 12
+  ml weather pressure   --elevation 500 --temp 15
+  ml weather wind_power --speed 10 --diameter 80
+
+Magnus dew point, JAG/TI wind chill, NOAA heat index, barometric formula, Betz limit.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_weather" "$@"
+}
+
+# ─── 子命令: ml environ ──────────────────────────────────────
+cmd_environ() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml environ — Environmental Science (Carbon/Energy/Water/Emissions/GWP/LCA)
+
+Actions:
+  ml environ carbon    --activity 100 --emissionFactor 0.5
+  ml environ energy    --building 1000 --kWh 15000 --fuel gas
+  ml environ water     --population 50000 --daily 150
+  ml environ emissions --fuel diesel --consumption 1000
+  ml environ gwp       --co2eq 5000 --component CH4
+  ml environ lca       --material steel --mass 1000
+
+IPCC Tier 1 emission factors, building energy rating (A+→E), embodied carbon LCA.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_environ" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -1920,6 +2007,10 @@ main() {
         geometry) cmd_geometry "$@" ;;
         econ)    cmd_econ "$@"    ;;
         fluid)   cmd_fluid "$@"   ;;
+        optics)  cmd_optics "$@"  ;;
+        reliability) cmd_reliability "$@" ;;
+        weather) cmd_weather "$@" ;;
+        environ) cmd_environ "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }

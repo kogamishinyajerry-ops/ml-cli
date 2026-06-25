@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 [![CI](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-70-blue)
+![Commands](https://img.shields.io/badge/commands-74-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -630,6 +630,22 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.12** (2026-06-25): `optics`, `reliability`, `weather`, `environ` commands.
+  Wave 12 — 4 new modules: optics (thin lens equation solver for v/u/f, Snell's
+  law refraction with total internal reflection detection, single-slit diffraction
+  fringe spacing, numerical aperture with Airy disk diameter, diffraction grating
+  with groove spacing, Brewster angle and Malus law polarization), reliability
+  engineering (2-parameter Weibull with reliability/hazard/B10, bathtub curve
+  with infant/useful/wear regions, MTBF with chi-squared 90% confidence interval
+  and availability, parallel/series reliability block diagrams), meteorology
+  (Magnus dew point with frost point, JAG/TI wind chill with frostbite time,
+  NOAA/NWS heat index with risk category, humidity metrics — specific/absolute/
+  relative, barometric pressure from elevation, wind turbine Betz limit power),
+  and environmental science (activity × emission factor carbon footprint with tree
+  equivalency, building energy rating A+→E with EUI, residential water demand,
+  IPCC Tier 1 fuel combustion emissions with CO2/CH4/N2O GWP, GWP100 conversion,
+  cradle-to-gate embodied carbon LCA for 8 materials with transport impact).
+  **74 commands total.**
 - **v0.3.11** (2026-06-25): `acoustics`, `geometry`, `econ`, `fluid` commands.
   Wave 11 — 4 new engineering modules: acoustics (SPL calculator, dB power/amplitude
   conversion with reverse-linear, Sabine/Eyring RT60 with Schroeder frequency,
