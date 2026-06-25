@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.12
+# ml — MATLAB CLI Tool  v0.3.13
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.12"
+readonly VERSION="0.3.13"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1695,6 +1695,51 @@ EOF
     forward_to "cli_environ" "$@"
 }
 
+# ─── 子命令: ml stress ───────────────────────────────────────
+cmd_stress() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml stress — Stress Analysis (Principal/VonMises/Mohr/Fatigue/Failure)
+
+Actions:
+  ml stress principal     --sx 100 --sy 50 --tau 25
+  ml stress von_mises     --s1 200 --s2 100 --s3 50
+  ml stress mohr          --sx 100 --sy -50 --tau 40
+  ml stress concentration --nominal 50 --Kt 2.5
+  ml stress fatigue       --Su 600 --Se 250 --sigma_a 150 --sigma_m 100
+  ml stress failure       --material steel --sx 100 --sy 50 --tau 30
+
+Principal stresses + angles, von Mises/Tresca, Mohr's circle, Goodman/Soderberg/Gerber fatigue.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_stress" "$@"
+}
+
+# ─── 子命令: ml beam ─────────────────────────────────────────
+cmd_beam() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml beam — Beam Analysis (Deflection/Moment/Shear/Section/Reactions/Slope)
+
+Actions:
+  ml beam deflection --length 5 --load 10000 --type simply --loadType point --loadPos 2.5
+  ml beam moment     --length 5 --load 10000 --type simply --loadType point --loadPos 2.5
+  ml beam shear      --length 5 --load 10000 --type simply --loadType udl
+  ml beam section    --b 0.1 --h 0.2 --E 200e9
+  ml beam reactions  --length 5 --load 10000 --type simply --loadType point --loadPos 2.5
+  ml beam slope      --length 5 --load 10000 --type cantilever --loadType point
+
+Supports: simply/cantilever/fixed/propped. Loads: point/udl/triangular.
+EI from b×h section or direct I, numerical double-integration solver.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_beam" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -2011,6 +2056,8 @@ main() {
         reliability) cmd_reliability "$@" ;;
         weather) cmd_weather "$@" ;;
         environ) cmd_environ "$@" ;;
+        stress)  cmd_stress "$@"  ;;
+        beam)    cmd_beam "$@"    ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
