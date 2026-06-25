@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.13
+# ml — MATLAB CLI Tool  v0.3.14
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.13"
+readonly VERSION="0.3.14"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1740,6 +1740,94 @@ EOF
     forward_to "cli_beam" "$@"
 }
 
+# ─── 子命令: ml geotech ──────────────────────────────────────
+cmd_geotech() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml geotech — Geotechnical Engineering (Bearing/Settlement/Slope/EarthPressure/Pile/SPT)
+
+Actions:
+  ml geotech bearing       --B 1.5 --Df 1 --c 20 --phi 30 --gamma 18
+  ml geotech settlement    --H 5 --Cc 0.3 --e0 0.8 --sigma0 100 --dsigma 50
+  ml geotech slope         --H 10 --phi 35 --c 15 --gamma 20 --beta 30
+  ml geotech earth_pressure --H 5 --phi 30 --gamma 18 --type active|passive|at_rest
+  ml geotech pile          --L 10 --D 0.5 --Nq 20 --Ngamma 100 --gamma 18
+  ml geotech spt           --N 15 --depth 5 --soil clay
+
+Terzaghi bearing capacity, consolidation settlement, infinite slope with seepage, Rankine earth pressure.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_geotech" "$@"
+}
+
+# ─── 子命令: ml concrete ─────────────────────────────────────
+cmd_concrete() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml concrete — Concrete Engineering (Mix/Strength/WCRatio/Volume/Rebar/Crack)
+
+Actions:
+  ml concrete mix      --fc 30 --slump 100 --aggSize 20
+  ml concrete strength --fc 30 --age 7 --cement typeI
+  ml concrete wc_ratio --fc 30 --cement typeI
+  ml concrete volume   --length 5 --width 3 --height 0.2
+  ml concrete rebar    --section rect --b 0.3 --h 0.5 --cover 0.04
+  ml concrete crack    --width 0.3 --steel 0.001 --Es 200
+
+ACI 211.1 mix design, Eurocode 2 strength gain, Abrams' law, Gergely-Lutz crack width.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_concrete" "$@"
+}
+
+# ─── 子命令: ml corrosion ────────────────────────────────────
+cmd_corrosion() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml corrosion — Corrosion Engineering (Rate/Galvanic/CP/Coating/Life/Potential)
+
+Actions:
+  ml corrosion rate      --metal steel --environment marine --temp 25
+  ml corrosion galvanic  --anode zinc --cathode steel --areaRatio 10
+  ml corrosion cp        --current 0.5 --area 10 --rho 15
+  ml corrosion coating   --thickness 300 --defects 5 --area_coat 50
+  ml corrosion life      --corrosionRate 0.1 --wallThick 10 --allowable 3
+  ml corrosion potential --ph 7 --temp 25 --metal iron
+
+Arrhenius temp correction, galvanic series potentials, Pourbaix simplified diagram.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_corrosion" "$@"
+}
+
+# ─── 子命令: ml seismic ──────────────────────────────────────
+cmd_seismic() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml seismic — Earthquake Engineering (Spectrum/BaseShear/PGA/Soil/Liquefaction/Drift)
+
+Actions:
+  ml seismic spectrum     --Sds 1.0 --Sd1 0.6 --T 0.5 --R 8
+  ml seismic base_shear   --W 5000 --Sds 1.0 --R 8 --I 1.0
+  ml seismic pga          --Mw 6.5 --distance 20 --soil rock
+  ml seismic soil         --Vs30 200 --N60 10
+  ml seismic liquefaction --N60 8 --depth 5 --Mw 6.5 --PGA 0.3
+  ml seismic drift        --storyHeight 3 --displacement 0.05
+
+ASCE 7-16 design spectrum, Seed-Idriss liquefaction, NEHRP site class, Boore-Atkinson GMPE.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_seismic" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -2058,6 +2146,10 @@ main() {
         environ) cmd_environ "$@" ;;
         stress)  cmd_stress "$@"  ;;
         beam)    cmd_beam "$@"    ;;
+        geotech) cmd_geotech "$@" ;;
+        concrete) cmd_concrete "$@" ;;
+        corrosion) cmd_corrosion "$@" ;;
+        seismic) cmd_seismic "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }

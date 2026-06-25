@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 [![CI](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-76-blue)
+![Commands](https://img.shields.io/badge/commands-80-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
