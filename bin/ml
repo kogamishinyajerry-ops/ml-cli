@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.8
+# ml — MATLAB CLI Tool  v0.3.9
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.8"
+readonly VERSION="0.3.9"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1389,6 +1389,96 @@ EOF
     forward_to "cli_image" "$@"
 }
 
+# ─── 子命令: ml crypto ───────────────────────────────────────
+cmd_crypto() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml crypto — Cryptography (Hash/Base64/XOR/Caesar/Vigenere/Random)
+
+Actions:
+  ml crypto hash     --data "hello" --algo sha256
+  ml crypto base64   --data "hello world" --op encode
+  ml crypto random   --bytes 16
+  ml crypto xor      --data "secret" --key "key"
+  ml crypto caesar   --data "HELLO" --shift 3
+  ml crypto vigenere --data "ATTACKATDAWN" --key "LEMON"
+
+SHA-256/SHA-1 implemented natively (no Java/toolbox required).
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_crypto" "$@"
+}
+
+# ─── 子命令: ml bio ──────────────────────────────────────────
+cmd_bio() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml bio — Bioinformatics (DNA/GC/Translate/Align/Motif/Stats)
+
+Actions:
+  ml bio dna       --seq "ATGC" --op complement|reverse|reverse_complement
+  ml bio gc        --seq "ATGCATGC"
+  ml bio translate --seq "ATGGCC" --frame 0
+  ml bio align     --seq1 AACCGGT --seq2 AACAGT --match 1 --mism -1 --gap -2
+  ml bio motif     --seq ATGCAATGCAA --pattern ATGCAA --mismatch 0
+  ml bio stats     --seq "ATGCATGC"
+
+Standard genetic code (table 1), Needleman-Wunsch global alignment.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_bio" "$@"
+}
+
+# ─── 子命令: ml chem ─────────────────────────────────────────
+cmd_chem() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml chem — Chemistry (MolarMass/GasLaw/pH/Dilution/Reaction/Balance)
+
+Actions:
+  ml chem molar_mass --formula "H2O"
+  ml chem molar_mass --formula "(NH4)2SO4"
+  ml chem gas_law    --p 101325 --v 0.0224 --n 1 --solve t
+  ml chem ph         --conc 0.01 --solute hcl|naoh|acetic
+  ml chem dilution   --c1 1.0 --v1 0.1 --c2 0.1 --solve v2
+  ml chem reaction   --order 1 --k 0.05 --conc0 1.0 --time 10
+  ml chem balance    --reactants "C3H8+O2" --products "CO2+H2O"
+
+Built-in element table (60+ elements), hydrocarbon combustion balancer.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_chem" "$@"
+}
+
+# ─── 子命令: ml physics ──────────────────────────────────────
+cmd_physics() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml physics — Physics (Constants/Kinematics/Projectile/Energy/Waves/Thermo/Circuit)
+
+Actions:
+  ml physics constants  --name c|h|G|k_B|...|all
+  ml physics kinematics --v0 0 --a 9.8 --t 3 --solve d
+  ml physics projectile --v0 50 --angle 45
+  ml physics energy     --m 2 --v 10 --h 5
+  ml physics waves      --f 440 --lambda 0.78 --solve v
+  ml physics thermo     --mass 1 --c 4186 --dt 80
+  ml physics circuit    --volts 12 --r "[10 20 30]" --type series|parallel
+
+14 physical constants, full kinematics/projectile, Ohm's law, Stefan-Boltzmann.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_physics" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -1690,6 +1780,10 @@ main() {
         finance) cmd_finance "$@" ;;
         map)     cmd_map "$@"     ;;
         image)   cmd_image "$@"   ;;
+        crypto)  cmd_crypto "$@"  ;;
+        bio)     cmd_bio "$@"     ;;
+        chem)    cmd_chem "$@"    ;;
+        physics) cmd_physics "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }

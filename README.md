@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-58-blue)
+![Commands](https://img.shields.io/badge/commands-62-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -120,6 +120,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml finance <act>` | Finance (options/portfolio/VaR/bond/IRR) | Base MATLAB | ✓ |
 | `ml map <act> --lat/--lon` | Geo (distance/greatcircle/geocode) | Base MATLAB | ✓ |
 | `ml image <act> --file` | Image processing (edge/filter/segment) | Image Processing | ✓ |
+| `ml crypto <act> --data` | Cryptography (SHA-256/Base64/XOR) | Base MATLAB | ✓ |
+| `ml bio <act> --seq` | Bioinformatics (DNA/translate/align) | Base MATLAB | ✓ |
+| `ml chem <act> --formula` | Chemistry (molar_mass/pH/gas_law) | Base MATLAB | ✓ |
+| `ml physics <act>` | Physics (constants/kinematics/circuit) | Base MATLAB | ✓ |
 
 ### Advanced
 
@@ -617,6 +621,22 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.9** (2026-06-25): `crypto`, `bio`, `chem`, `physics` commands.
+  Wave 9 — 4 new science/engineering modules: cryptography (native SHA-256 + SHA-1
+  implementations, Base64 encode/decode, XOR cipher, Caesar & Vigenère ciphers,
+  secure random byte generator), bioinformatics (DNA complement/reverse,
+  GC content with molecular weight, standard genetic code translation with stop
+  codon detection, Needleman-Wunsch global pairwise alignment with match line,
+  motif search with mismatches, comprehensive sequence statistics with Wallace
+  Tm & di-nucleotide counts), chemistry (formula parser with parentheses support
+  for 60+ elements, ideal gas law solver, strong/weak acid pH with quadratic
+  formula for Ka, dilution calculator, 0/1/2-order reaction kinetics,
+  hydrocarbon combustion balancer), and physics (14 physical constants database,
+  1D kinematics solver, projectile motion with trajectory samples, kinetic/
+  potential/mechanical energy, wave equation + Doppler effect, heat equation
+  with phase change + Stefan-Boltzmann radiation, series/parallel circuit
+  analyzer with voltage drops).
+  **62 commands total.**
 - **v0.3.8** (2026-06-25): `text`, `finance`, `map`, `image` commands.
   Wave 8 — 4 new modules: text processing (tokenize, stats with Flesch reading
   ease, regex match with token groups, lexicon-based sentiment, TF keyword
