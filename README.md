@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 [![CI](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-74-blue)
+![Commands](https://img.shields.io/badge/commands-76-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -630,6 +630,21 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.13** (2026-06-25): `stress`, `beam` commands.
+  Wave 13 — stress analysis and beam mechanics: principal stress calculation
+  with angle determination from plane stress state, von Mises equivalent
+  stress with hydrostatic/triaxiality decomposition, Mohr's circle construction
+  with 24-point sampling, stress concentration factor analysis, multi-model
+  fatigue analysis (Modified Goodman, Soderberg, Gerber parabola, ASME-elliptic)
+  with fatigue life classification, material yield failure checking against
+  built-in steel/aluminum/titanium/cast_iron properties, and a complete Euler-
+  Bernoulli beam solver with 4 support types (simply supported, cantilever,
+  fixed-fixed, propped cantilever), 3 load types (point, uniformly distributed,
+  triangular), numerical double-integration solver producing deflection/rotation/
+  moment/shear diagrams at configurable resolution, section property calculator
+  (I, S, radius of gyration from b×h), reaction force solver with equilibrium
+  verification, and slope via finite difference of deflection curve.
+  **76 commands total.**
 - **v0.3.12** (2026-06-25): `optics`, `reliability`, `weather`, `environ` commands.
   Wave 12 — 4 new modules: optics (thin lens equation solver for v/u/f, Snell's
   law refraction with total internal reflection detection, single-slit diffraction
