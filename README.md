@@ -3,7 +3,7 @@
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 [![CI](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/kogamishinyajerry-ops/ml-cli/actions/workflows/ci.yml)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-66-blue)
+![Commands](https://img.shields.io/badge/commands-70-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -129,6 +129,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml queue <act>` | Queueing (M/M/1, M/M/c, Little's law) | Base MATLAB | ✓ |
 | `ml game <act>` | Game theory (Nash/prisoner/mixed) | Base MATLAB | ✓ |
 | `ml color <act> --hex` | Color theory (HSL/CMYK/palette/contrast) | Base MATLAB | ✓ |
+| `ml acoustics <act>` | Acoustics (SPL/RT60/room modes/absorption) | Base MATLAB | ✓ |
+| `ml geometry <act>` | 2D/3D Geometry (area/volume/hull/intersect) | Base MATLAB | ✓ |
+| `ml econ <act>` | Economics (supply/demand/elasticity/compound) | Base MATLAB | ✓ |
+| `ml fluid <act>` | Fluid dynamics (Reynolds/Bernoulli/pipe/drag) | Base MATLAB | ✓ |
 
 ### Advanced
 
@@ -626,6 +630,23 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.11** (2026-06-25): `acoustics`, `geometry`, `econ`, `fluid` commands.
+  Wave 11 — 4 new engineering modules: acoustics (SPL calculator, dB power/amplitude
+  conversion with reverse-linear, Sabine/Eyring RT60 with Schroeder frequency,
+  room eigenmodes classification — axial/tangential/oblique, ISO 9613-1 air
+  absorption with relaxation frequencies, single-leaf transmission loss with
+  coincidence dip correction), geometry (polygon area via shoelace formula, sphere/
+  cylinder/cone/cube/pyramid volumes, polygon centroid, point-to-point and point-
+  to-line distances, Graham scan convex hull, 2D segment intersection with
+  parametric solution), economics (linear supply/demand equilibrium with consumer
+  and producer surplus, arc elasticity classification, break-even analysis via
+  contribution margin, discrete/continuous compound interest with effective rate,
+  Cobb-Douglas utility with marginal utility per dollar, fixed/variable cost
+  analysis), and fluid dynamics (Reynolds number with laminar/transitional/
+  turbulent regime, Bernoulli equation solver for P2/V2/Z2, Darcy-Weisbach pipe
+  flow with Colebrook-White friction factor iteration, drag force/power, head
+  loss with entrance/exit minor losses, pump hydraulic/shaft power).
+  **70 commands total.**
 - **v0.3.10** (2026-06-25): `astro`, `queue`, `game`, `color` commands.
   Wave 10 — 4 new modules: astronomy (Kepler's equation with true→eccentric
   anomaly, Vis-viva orbital velocity, absolute parameters for 8 solar system

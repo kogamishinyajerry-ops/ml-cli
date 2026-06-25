@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.10
+# ml — MATLAB CLI Tool  v0.3.11
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.10"
+readonly VERSION="0.3.11"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1520,6 +1520,94 @@ EOF
     forward_to "cli_color" "$@"
 }
 
+# ─── 子命令: ml acoustics ────────────────────────────────────
+cmd_acoustics() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml acoustics — Acoustics (SPL/dB/RT60/RoomModes/Absorption/Transmission)
+
+Actions:
+  ml acoustics spl          --pressure 0.02 --ref 2e-5
+  ml acoustics db           --value 2 --ref 1 --type power|amplitude
+  ml acoustics rt60         --volume 100 --area 150 --alpha 0.15 --method sabine|eyring
+  ml acoustics room_modes   --lx 5 --ly 4 --lz 3 --nmax 3
+  ml acoustics absorption   --freq 1000 --temp 20 --rh 50
+  ml acoustics transmission --freq 500 --mass 10
+
+ISO 9613-1 air absorption, Sabine/Eyring RT60, room eigenmodes, single-leaf TL mass law.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_acoustics" "$@"
+}
+
+# ─── 子命令: ml geometry ─────────────────────────────────────
+cmd_geometry() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml geometry — 2D/3D Geometry (Area/Volume/Centroid/Distance/Hull/Intersect)
+
+Actions:
+  ml geometry area      --shape polygon --vertices "[0,0;4,0;4,3]"
+  ml geometry volume    --shape sphere --r 2
+  ml geometry centroid  --vertices "[0,0;4,0;4,3;0,3]"
+  ml geometry distance  --p1 "[1,2]" --p2 "[4,6]"
+  ml geometry hull      --points "[0,0;1,0;1,1;0.5,0.5;0,2]"
+  ml geometry intersect --s1 "[0,0;4,4]" --s2 "[0,4;4,0]"
+
+Shoelace formula, Graham scan convex hull, segment intersection solver.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_geometry" "$@"
+}
+
+# ─── 子命令: ml econ ─────────────────────────────────────────
+cmd_econ() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml econ — Microeconomics (SupplyDemand/Elasticity/Breakeven/Compound/Utility/Cost)
+
+Actions:
+  ml econ supply_demand --demand "10,-0.5" --supply "2,0.3"
+  ml econ elasticity    --q1 100 --q2 80 --p1 10 --p2 12
+  ml econ breakeven     --fixed 10000 --price 50 --variable 30
+  ml econ compound      --principal 1000 --rate 0.05 --years 10
+  ml econ utility       --bundle "[10,5]" --prices "[2,3]" --budget 100
+  ml econ cost          --quantity 500 --fixed 10000 --variable 20
+
+Equilibrium price/quantity, arc elasticity, contribution margin, Cobb-Douglas utility.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_econ" "$@"
+}
+
+# ─── 子命令: ml fluid ────────────────────────────────────────
+cmd_fluid() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml fluid — Fluid Dynamics (Reynolds/Bernoulli/Pipe/Drag/HeadLoss/Pump)
+
+Actions:
+  ml fluid reynolds  --velocity 2 --length 0.1 --nu 1e-6
+  ml fluid bernoulli --p1 101325 --v1 5 --z1 0 --z2 10 --rho 1000 --solve p2
+  ml fluid pipe_flow --diameter 0.05 --length 100 --flow 0.001 --nu 1e-6
+  ml fluid drag      --velocity 30 --area 2.5 --rho 1.225 --cd 0.3
+  ml fluid head_loss --velocity 2 --diameter 0.1 --length 50 --friction 0.02
+  ml fluid pump      --flow 0.01 --head 20 --rho 1000 --efficiency 0.75
+
+Colebrook-White friction factor solver, Darcy-Weisbach, Bernoulli with z-components.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_fluid" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -1828,6 +1916,10 @@ main() {
         queue)   cmd_queue "$@"   ;;
         game)    cmd_game "$@"    ;;
         color)   cmd_color "$@"   ;;
+        acoustics) cmd_acoustics "$@" ;;
+        geometry) cmd_geometry "$@" ;;
+        econ)    cmd_econ "$@"    ;;
+        fluid)   cmd_fluid "$@"   ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
