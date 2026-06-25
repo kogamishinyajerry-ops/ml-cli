@@ -29,8 +29,8 @@ jobs:
           errors=0
           for f in matlab/cli_*.m; do
             fname=$(basename "$f" .m)
-            if ! grep -q "^function ${fname}(" "$f" 2>/dev/null; then
-              echo "FAIL: $f — missing function ${fname}() signature"
+            if ! grep -q "function.*${fname}(" "$f" 2>/dev/null; then
+              echo "FAIL: $f — missing function ${fname} definition"
               errors=$((errors + 1))
             elif [ ! -s "$f" ]; then
               echo "FAIL: $f — empty file"
