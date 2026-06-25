@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/repository-GitHub-181717?logo=github)](https://github.com/kogamishinyajerry-ops/ml-cli)
 ![MATLAB R2026a](https://img.shields.io/badge/MATLAB-R2026a-orange)
-![Commands](https://img.shields.io/badge/commands-62-blue)
+![Commands](https://img.shields.io/badge/commands-66-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > **CLI Anything**: 把 MATLAB 变成可组合的 Unix 管道工具。
@@ -124,6 +124,10 @@ ml wavelet denoise --signal "$SIG" --wavelet db4 --level 3 --threshold -1
 | `ml bio <act> --seq` | Bioinformatics (DNA/translate/align) | Base MATLAB | ✓ |
 | `ml chem <act> --formula` | Chemistry (molar_mass/pH/gas_law) | Base MATLAB | ✓ |
 | `ml physics <act>` | Physics (constants/kinematics/circuit) | Base MATLAB | ✓ |
+| `ml astro <act>` | Astronomy (kepler/seasons/jd/redshift) | Base MATLAB | ✓ |
+| `ml queue <act>` | Queueing (M/M/1, M/M/c, Little's law) | Base MATLAB | ✓ |
+| `ml game <act>` | Game theory (Nash/prisoner/mixed) | Base MATLAB | ✓ |
+| `ml color <act> --hex` | Color theory (HSL/CMYK/palette/contrast) | Base MATLAB | ✓ |
 
 ### Advanced
 
@@ -621,6 +625,22 @@ ml fit poly --degree 1 --xy "0,0,1,1" --json | jq '.coefficients'
 
 ## Version History
 
+- **v0.3.10** (2026-06-25): `astro`, `queue`, `game`, `color` commands.
+  Wave 10 — 4 new modules: astronomy (Kepler's equation with true→eccentric
+  anomaly, Vis-viva orbital velocity, absolute parameters for 8 solar system
+  bodies, apparent magnitude from flux, redshift→Hubble distance, RA/Dec
+  parsing, solar declination + equation of time + sunrise/sunset + day length
+  + season detection, Julian/Modified Julian Date + day of week), queueing
+  theory (M/M/1 and M/M/c Erlang-C steady-state, Little's law bidirectional
+  solver, state probability, M/G/1 Pollaczek-Khinchine), game theory
+  (pure-strategy Nash equilibrium by best response, strict dominance,
+  Prisoner's Dilemma with payoff matrix, mixed-strategy NE via indifference
+  condition for 2x2 games, zero-sum minimax saddle point check), and color
+  theory (RGB↔HSL/HSV/CMYK conversion, complementary color, 5 palette
+  schemes — analogous/complementary/triadic/tetradic/monochromatic, WCAG
+  AA/AAA contrast ratio check, linear interpolation blend, nearest
+  named color matching from 20-color palette).
+  **66 commands total.**
 - **v0.3.9** (2026-06-25): `crypto`, `bio`, `chem`, `physics` commands.
   Wave 9 — 4 new science/engineering modules: cryptography (native SHA-256 + SHA-1
   implementations, Base64 encode/decode, XOR cipher, Caesar & Vigenère ciphers,

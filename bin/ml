@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.9
+# ml — MATLAB CLI Tool  v0.3.10
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.9"
+readonly VERSION="0.3.10"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1479,6 +1479,95 @@ EOF
     forward_to "cli_physics" "$@"
 }
 
+# ─── 子命令: ml astro ───────────────────────────────────────
+cmd_astro() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml astro — Astronomy (Kepler/Orbit/Magnitude/Redshift/RADec/Seasons/JD)
+
+Actions:
+  ml astro kepler    --body earth --e 0.0167 --nu 30
+  ml astro orbit     --a 7000e3 --e 0.01 --mu 3.986e14
+  ml astro magnitude --flux 1e-10
+  ml astro redshift  --lambda_obs 656.8 --lambda_rest 656.3
+  ml astro radec     --ra "10h30m15s" --dec "+20d15m30s"
+  ml astro seasons   --lat 40 --lon 116 --date 2026-06-21
+  ml astro jd        --year 2026 --month 6 --day 21
+
+Built-in solar system bodies: earth/mars/venus/moon/jupiter/saturn/sun.
+Solar declination, equation of time, sunrise/sunset, season detection.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_astro" "$@"
+}
+
+# ─── 子命令: ml queue ───────────────────────────────────────
+cmd_queue() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml queue — Queueing Theory (M/M/1, M/M/c, Little's Law, M/G/1)
+
+Actions:
+  ml queue mm1    --lambda 5 --mu 6
+  ml queue mmc    --lambda 10 --mu 4 --c 3
+  ml queue little --lambda 5 --w 0.5
+  ml queue prob   --lambda 3 --mu 4 --n 2
+  ml queue mg1    --lambda 3 --mu 5 --cv_sq 2
+
+Steady-state metrics: L, Lq, W, Wq, utilization, Erlang-C, state probabilities.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_queue" "$@"
+}
+
+# ─── 子命令: ml game ────────────────────────────────────────
+cmd_game() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml game — Game Theory (Nash/Dominant/Prisoner/Mixed/Zero-sum/Payoff)
+
+Actions:
+  ml game nash     --payoff "[3,0,5,1,0,2,4,3]"
+  ml game dominant --payoff "[3,0,5,1,0,2,4,3]"
+  ml game prisoner --tempt 5 --reward 3 --punish 1 --sucker 0
+  ml game mixed    --payoff "[3,0,5,1,0,2,4,3]"
+  ml game zero_sum --payoff "[2,-1,-3,4]"
+
+Pure-strategy Nash equilibrium, strict dominance, Prisoner's Dilemma analysis,
+mixed-strategy NE (indifference condition), zero-sum saddle point check.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_game" "$@"
+}
+
+# ─── 子命令: ml color ───────────────────────────────────────
+cmd_color() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml color — Color Theory (Convert/Complement/Palette/Contrast/Blend/Name)
+
+Actions:
+  ml color convert --hex "#FF8000" --to hsl|hsv|cmyk
+  ml color complement --hex "#FF8000"
+  ml color palette --base "#3B82F6" --scheme analogous|triadic|tetradic|monochromatic --count 5
+  ml color contrast --bg "#FFFFFF" --fg "#000000"
+  ml color blend --c1 "#FF0000" --c2 "#0000FF" --ratio 0.5
+  ml color name --hex "#FF8000"
+
+Full RGB↔HSL/HSV/CMYK, WCAG contrast ratios, 5 color scheme types, nearest named color matching.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_color" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -1784,6 +1873,10 @@ main() {
         bio)     cmd_bio "$@"     ;;
         chem)    cmd_chem "$@"    ;;
         physics) cmd_physics "$@" ;;
+        astro)   cmd_astro "$@"   ;;
+        queue)   cmd_queue "$@"   ;;
+        game)    cmd_game "$@"    ;;
+        color)   cmd_color "$@"   ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
