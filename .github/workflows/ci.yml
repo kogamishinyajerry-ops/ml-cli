@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Structural integrity ──
+  lint:
+    name: Lint & Structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: warning
+          scandir: bin
+
+      - name: Validate MATLAB files
+        run: |
+          errors=0
+          for f in matlab/cli_*.m; do
+            fname=$(basename "$f" .m)
+            if ! grep -q "^function ${fname}(" "$f" 2>/dev/null; then
+              echo "FAIL: $f — missing function ${fname}() signature"
+              errors=$((errors + 1))
+            elif [ ! -s "$f" ]; then
+              echo "FAIL: $f — empty file"
+              errors=$((errors + 1))
+            elif ! grep -q "catch ME" "$f" 2>/dev/null; then
+              echo "WARN: $f — no error handler"
+            else
+              echo "OK: $f ($(wc -l < "$f") lines)"
+            fi
+          done
+          [ "$errors" -eq 0 ] || exit 1
+
+      - name: Verify shared helpers exist
+        run: |
+          for h in matlab/jsonify.m matlab/to_table.m matlab/to_csv.m; do
+            [ -f "$h" ] || { echo "MISSING: $h"; exit 1; }
+          done
+          echo "All shared helpers present"
+
+  # ── Dispatch integrity ──
+  dispatch:
+    name: Dispatch Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cmd_ functions → dispatch target audit
+        run: |
+          echo "=== Checking all cmd_ functions have valid dispatch target ==="
+          errors=0
+          # Collect cmd_ function names (exclude cmd_help which is standalone)
+          grep -oP 'cmd_([a-z0-9]+)\b' bin/ml | sort -u | while read -r cmdf; do
+            name=${cmdf#cmd_}
+            # Check if it uses forward_to or a direct run_matlab call
+            if grep -q "forward_to.*cli_${name}" bin/ml 2>/dev/null; then
+              f="matlab/cli_${name}.m"
+              if [ -f "$f" ]; then
+                echo "  OK: ${cmdf} → forward_to cli_${name} ($(wc -l < "$f") lines)"
+              else
+                echo "  FAIL: ${cmdf} forwards to missing ${f}"
+                errors=$((errors + 1))
+              fi
+            elif grep -q "run_matlab" bin/ml; then
+              # Legacy commands that use run_matlab directly (eval, run, info, etc.)
+              echo "  OK: ${cmdf} (legacy: run_matlab)"
+            else
+              echo "  WARN: ${cmdf} — no forward_to or run_matlab found"
+            fi
+          done 2>/dev/null
+          [ "$errors" -eq 0 ] || exit 1
+
+      - name: No duplicate dispatcher entries
+        run: |
+          dups=$(grep -oP '^\s+([a-z]+)\)' bin/ml | sed 's/[ )]//g' | sort | uniq -d)
+          if [ -n "$dups" ]; then
+            echo "WARNING: Duplicate dispatcher entries: $dups"
+            echo "  This is harmless but should be cleaned up."
+          else
+            echo "OK: No duplicate dispatcher entries"
+          fi
+
+  # ── Consistency checks ──
+  consistency:
+    name: Version & Count Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version matches tag
+        run: |
+          tag=$(git tag --points-at HEAD 2>/dev/null || echo "")
+          if [ -n "$tag" ]; then
+            version="${tag#v}"
+            bin_version=$(grep 'readonly VERSION=' bin/ml | sed 's/.*"\(.*\)"/\1/')
+            if [ "$version" != "$bin_version" ]; then
+              echo "FAIL: git tag $tag != bin/ml VERSION=$bin_version"
+              exit 1
+            fi
+            echo "OK: $tag == VERSION=$bin_version"
+          else
+            echo "INFO: No tag on this commit (PR)"
+          fi
+
+      - name: README badge vs cli module count
+        run: |
+          badge=$(grep "commands-" README.md | head -1 | sed 's/.*commands-//;s/-.*//')
+          modules=$(ls matlab/cli_*.m 2>/dev/null | wc -l | tr -d ' ')
+          # Total commands = cli modules + legacy built-ins
+          # The relationship is badge > modules (some commands are built into bin/ml)
+          echo "Modules (cli_*.m): $modules"
+          echo "README badge: $badge"
+          if [ "$badge" -le "$modules" ]; then
+            echo "FAIL: badge ($badge) should be greater than modules ($modules)"
+            exit 1
+          fi
+          echo "OK: badge=$badge > modules=$modules"
+
+      - name: Version history contains latest
+        run: |
+          version=$(grep 'readonly VERSION=' bin/ml | sed 's/.*"\(.*\)"/\1/')
+          if grep -q "v${version}" README.md; then
+            echo "OK: v${version} in README Version History"
+          else
+            echo "FAIL: v${version} missing from README Version History"
+            exit 1
+          fi
+
+  # ── MATLAB tests ──
+  # Requires a self-hosted runner with MATLAB installed and licensed.
+  # To enable: change `runs-on: self-hosted` and remove the `if: false` guard.
+  matlab-tests:
+    name: MATLAB Tests
+    runs-on: ubuntu-latest
+    if: false   # disabled — enable for self-hosted MATLAB runners
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add ml to PATH
+        run: echo "$(pwd)/bin" >> $GITHUB_PATH
+
+      - name: Run test suite
+        run: |
+          chmod +x tests/test_all.sh 2>/dev/null || true
+          bash tests/test_all.sh 2>&1
+
+      - name: Smoke test all module commands
+        run: |
+          errors=0
+          smoke() {
+            echo -n "  $1 ... "
+            if ml "$@" >/dev/null 2>&1; then echo "OK"; else echo "FAIL"; errors=$((errors+1)); fi
+          }
+          smoke crypto hash --data hi --algo sha1
+          smoke bio gc --seq ATGC
+          smoke chem molar_mass --formula NaCl
+          smoke physics constants --name c
+          smoke astro jd --year 2025 --month 1 --day 1
+          smoke queue mm1 --lambda 5 --mu 7
+          smoke game prisoner
+          smoke color complement --hex '#FF0000'
+          smoke text tokenize --input hello
+          smoke finance options --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2
+          smoke map geocode --address Tokyo
+          smoke crypto base64 --data hi --op encode
+
+          echo "=== $errors errors ==="
+          [ "$errors" -eq 0 ] || exit 1

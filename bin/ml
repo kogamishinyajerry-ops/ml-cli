@@ -253,54 +253,6 @@ HELP
     esac
 }
 
-# ─── 子命令: image ──────────────────────────────────────────
-cmd_image() {
-    local file="" op="info" fmt="text" dim="" out=""
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --json)   fmt="json";  shift ;;
-            --table)  fmt="table"; shift ;;
-            --info)   op="info";   shift ;;
-            --resize) op="resize"; dim="$2"; shift 2 ;;
-            --gray)   op="gray";   shift ;;
-            --edge)   op="edge";   shift ;;
-            --hist)   op="hist";   shift ;;
-            --save)   out="$2";    shift 2 ;;
-            -h|--help)
-                cat <<'HELP'
-ml image <file> [--info|--resize WxH|--gray|--edge|--hist] [--save out.png]
-  Image processing CLI.
-  --info       Image metadata (JSON)
-  --resize WxH Resize dimensions
-  --gray       Convert to grayscale
-  --edge       Edge detection (Canny)
-  --hist       Histogram data (JSON)
-  --json       Output as JSON
-  --save FILE  Save result image
-HELP
-                return 0 ;;
-            *) file="$1"; shift ;;
-        esac
-    done
-
-    [[ -z "$file" ]] && die "image needs file: ml image photo.png"
-    [[ ! -f "$file" ]] && die "file not found: $file"
-
-    local save_clause=""
-    [[ -n "$out" ]] && save_clause=";imwrite(img,'${out}')"
-
-    case "$op" in
-        info)  run_matlab "$(format_result "image_info('${file}')" "${fmt}")" ;;
-        gray)  run_matlab "img=rgb2gray(imread('${file}'));imshow(img);${save_clause}" ;;
-        edge)  run_matlab "img=edge(rgb2gray(imread('${file}')),'canny');imshow(img);${save_clause}" ;;
-        hist)  run_matlab "$(format_result "image_hist('${file}')" "${fmt}")" ;;
-        resize)
-            w="${dim%x*}"; h="${dim#*x}"
-            run_matlab "img=imresize(imread('${file}'),[${h},${w}]);imshow(img);${save_clause}" ;;
-    esac
-}
-
 # ─── 子命令: control ────────────────────────────────────────
 cmd_control() {
     local op="step" sys="" fmt="text"
@@ -1868,7 +1820,6 @@ main() {
         text)    cmd_text "$@"    ;;
         finance) cmd_finance "$@" ;;
         map)     cmd_map "$@"     ;;
-        image)   cmd_image "$@"   ;;
         crypto)  cmd_crypto "$@"  ;;
         bio)     cmd_bio "$@"     ;;
         chem)    cmd_chem "$@"    ;;
