@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# ml — MATLAB CLI Tool  v0.3.15
+# ml — MATLAB CLI Tool  v0.3.16
 # =============================================================================
 # 把 MATLAB 变成 Unix CLI 一等公民。
 # CLI anything 哲学:管道 + 结构化输出 + 零 GUI + 可脚本化。
@@ -23,7 +23,7 @@ readonly ML_CLI_DIR="${HOME}/ml-cli"
 readonly MATLAB_SKILLS="${MATLAB_SKILLS:-${HOME}/matlab-skills}"
 readonly MATLAB_BIN="${MATLAB_BIN:-/Applications/MATLAB_R2026a.app/bin/matlab}"
 readonly MATLAB_LIB="${ML_CLI_DIR}/matlab"
-readonly VERSION="0.3.15"
+readonly VERSION="0.3.16"
 
 # ─── 工具函数 ────────────────────────────────────────────────
 die()  { echo "ml: ERROR: ${*}" >&2; exit 1; }
@@ -1915,6 +1915,51 @@ EOF
     forward_to "cli_fire" "$@"
 }
 
+# ─── 子命令: ml vibration ────────────────────────────────────
+cmd_vibration() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml vibration — Vibration Analysis (Natural/Response/Isolation/SDOF/LogDecrement)
+
+Actions:
+  ml vibration natural       --m 100 --k 10000 --c 50
+  ml vibration response      --m 1 --k 1000 --c 10 --F0 50 --omega 20
+  ml vibration isolation     --freq 50 --fn 10 --damping 0.05
+  ml vibration sdof          --m 5 --k 20000 --F0 100 --omega 15 --c 30
+  ml vibration log_decrement --x1 10 --x2 5 --nCycles 3
+
+Natural freq + damping ratio + regime, steady-state forced response (amplitude/phase/M),
+transmissibility + isolation efficiency, log decrement → damping ratio.
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_vibration" "$@"
+}
+
+# ─── 子命令: ml ventilation ──────────────────────────────────
+cmd_ventilation() {
+    case "$1" in
+        -h|--help)
+            cat <<'EOF'
+ml ventilation — HVAC & Ventilation (Duct/PressureLoss/Cooling/Fan/AirChange/Natural)
+
+Actions:
+  ml ventilation duct          --flow 0.5 --velocity 6
+  ml ventilation pressure_loss --length 10 --diameter 0.3 --flow 0.5
+  ml ventilation cooling       --area 200 --occupants 50 --lighting 15 --equipment 20
+  ml ventilation fan           --flow 1.0 --pressure 250 --efficiency 0.7
+  ml ventilation air_change    --volume 500 --ach 6
+  ml ventilation natural       --A 2 --h 3 --dT 10 --Cd 0.62
+
+Duct sizing, Colebrook friction pressure loss, simplified cooling load (occupants/lighting/equipment/envelope),
+fan power (kW + tons of refrigeration).
+EOF
+            return 0 ;;
+    esac
+    forward_to "cli_ventilation" "$@"
+}
+
 # ─── 子命令: ml ml ──────────────────────────────────────────
 cmd_ml() {
     case "$1" in
@@ -2241,6 +2286,8 @@ main() {
         hydrology) cmd_hydrology "$@" ;;
         pavement) cmd_pavement "$@" ;;
         fire)    cmd_fire "$@"    ;;
+        vibration) cmd_vibration "$@" ;;
+        ventilation) cmd_ventilation "$@" ;;
         *)       die "unknown '${cmd}'. Try: ml help" ;;
     esac
 }
